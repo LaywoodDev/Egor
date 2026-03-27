@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
-import { Home as HomeIcon, LayoutGrid, Search, User, LogOut, MessageCircle, Eye, ShieldCheck } from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
+import { motion, useInView } from 'motion/react'
+import { Home as HomeIcon, LayoutGrid, Search, User, LogOut, MessageCircle, Eye, Bell } from 'lucide-react'
 import { linkify } from './linkify'
 import { openMention } from './mentionHelper'
 import PostPage from './PostPage'
@@ -13,6 +14,7 @@ import UserProfilePage from './UserProfilePage'
 import ImageViewer from './ImageViewer'
 import Composer from './Composer'
 import AdminPanel from './AdminPanel'
+import NotificationsPage from './NotificationsPage'
 
 const ADMIN_ID = '20111c2e-e9c9-4e16-aba4-d7364aa98204'
 
@@ -126,13 +128,55 @@ function parseImageUrl(imageUrl?: string): string[] {
   return [imageUrl]
 }
 
-function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpenProfile, onOpenImage, onDelete, onEdit }: {
-  post: Post; liked: boolean; onLike: () => void; myAvatarUrl?: string; onVote: (i: number) => void; onOpenPost: () => void; onOpenProfile: (userId: string) => void; onOpenImage: (urls: string[], index: number) => void; onDelete: (id: string) => void; onEdit?: (id: string, text: string, image_url?: string) => void
+const sessionViewedIds = new Set<string>()
+
+function AnimatedPost({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { amount: 0.3, once: false })
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ scale: 0.7, opacity: 0 }}
+      animate={inView ? { scale: 1, opacity: 1 } : { scale: 0.7, opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpenProfile, onOpenImage, onDelete, onEdit, onView }: {
+  post: Post; liked: boolean; onLike: () => void; myAvatarUrl?: string; onVote: (i: number) => void; onOpenPost: () => void; onOpenProfile: (userId: string) => void; onOpenImage: (urls: string[], index: number) => void; onDelete: (id: string) => void; onEdit?: (id: string, text: string, image_url?: string) => void; onView?: (id: string) => void
 }) {
   const imageUrls = parseImageUrl(post.image_url)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [likeDir, setLikeDir] = useState<'up' | 'down' | null>(null)
+
+
+  const handleLike = () => {
+    setLikeDir(liked ? 'down' : 'up')
+    onLike()
+  }
+
+  useEffect(() => {
+    if (sessionViewedIds.has(post.id)) return
+    const el = cardRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        observer.disconnect()
+        sessionViewedIds.add(post.id)
+        supabase.rpc('increment_view_count', { post_id: post.id })
+        onView?.(post.id)
+      }
+    }, { threshold: 0.5 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [post.id])
+
 
   return (
-    <div className="card post" style={{ cursor: 'pointer' }} onClick={onOpenPost}>
+    <div ref={cardRef} className="card post" style={{ cursor: 'pointer' }} onClick={onOpenPost}>
       <div className="post-header" onClick={e => e.stopPropagation()}>
         <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>
           {post.mine
@@ -165,9 +209,13 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
       {post.poll && <div onClick={e => e.stopPropagation()}><PollDisplay poll={post.poll} onVote={onVote}/></div>}
       <div className="post-footer" onClick={e => e.stopPropagation()}>
         <div className="post-footer-left">
-          <button className="like-btn" onClick={onLike}>
+          <button className="like-btn" onClick={handleLike}>
             <IcHeart filled={liked}/>
-            <span>{post.like_count}</span>
+            <span style={{ display: 'inline-block', overflow: 'hidden', height: '1.2em', verticalAlign: 'middle', lineHeight: '1.2em' }}>
+              <span key={post.like_count} className={likeDir === 'up' ? 'slot-up' : likeDir === 'down' ? 'slot-down' : ''} style={{ display: 'block' }}>
+                {post.like_count}
+              </span>
+            </span>
           </button>
           <button className="comment-btn" onClick={onOpenPost}>
             <MessageCircle size={18} strokeWidth={1.8}/>
@@ -182,7 +230,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
   )
 }
 
-type NavItem = 'home' | 'categories' | 'search' | 'profile' | 'admin'
+type NavItem = 'home' | 'categories' | 'search' | 'notifications' | 'profile'
 
 function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [active, setActive] = useState<NavItem>('home')
@@ -202,6 +250,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [viewerIndex, setViewerIndex] = useState(0)
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
   const feedWrapperRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -209,6 +258,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
       if (data.user) { setUserId(data.user.id); loadProfile(data.user.id) }
     })
     loadPosts()
+    loadUnreadCount()
     const hash = window.location.hash.slice(1)
     if (hash.startsWith('/post/')) setPendingPostId(hash.slice(6))
     else if (hash.startsWith('/profile/')) setPendingProfileId(hash.slice(9))
@@ -219,6 +269,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     const post = posts.find(p => p.id === pendingPostId)
     if (post) { setSelectedPost(post); setPendingPostId(null) }
   }, [pendingPostId, posts])
+
 
   useEffect(() => {
     if (!pendingProfileId || !userId) return
@@ -242,7 +293,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const loadProfile = async (uid: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('display_name, username, created_at, avatar_url, banner_url, bio, verified, likes_visibility')
+      .select('display_name, username, created_at, avatar_url, banner_url, bio, verified, likes_visibility, mentions_visibility, notif_enabled, notif_likes, notif_comments, notif_mentions')
       .eq('id', uid)
       .maybeSingle()
     if (!error && data) setProfile(data)
@@ -334,6 +385,23 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
         poll: data.poll ? { options: data.poll.options, vote_counts: Array(data.poll.options.length).fill(0) } : undefined,
       }
       setPosts(prev => [newPost, ...prev])
+
+      // Send mention notifications
+      const mentions = [...new Set((text.match(/@([a-zA-Z0-9_]+)/g) ?? []).map(m => m.slice(1)))]
+      if (mentions.length > 0) {
+        const { data: mentioned } = await supabase
+          .from('profiles')
+          .select('id, notif_enabled, notif_mentions')
+          .in('username', mentions)
+        if (mentioned) {
+          const notifInserts = mentioned
+            .filter((p: any) => p.id !== user.id && p.notif_enabled !== false && p.notif_mentions !== false)
+            .map((p: any) => ({ user_id: p.id, actor_id: user.id, type: 'mention', post_id: data.id }))
+          if (notifInserts.length > 0) {
+            await supabase.from('user_notifications').insert(notifInserts)
+          }
+        }
+      }
     }
   }
 
@@ -366,17 +434,28 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     }
   }
 
+  const loadUnreadCount = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { count } = await supabase
+      .from('user_notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
+    setUnreadCount(count ?? 0)
+  }
+
   const handleOpenProfile = (uid: string) => {
     if (uid === userId) { setActive('profile'); setViewingUserId(null); setSelectedPost(null) }
     else { setViewingUserId(uid); setSelectedPost(null) }
   }
 
-  const navItems: { id: NavItem; label: string; icon: JSX.Element }[] = [
-    { id: 'home',       label: 'Главная',   icon: <HomeIcon size={20}/> },
-    { id: 'categories', label: 'Категории', icon: <LayoutGrid size={20}/> },
-    { id: 'search',     label: 'Поиск',     icon: <Search size={20}/> },
-    { id: 'profile',    label: 'Профиль',   icon: <User size={20}/> },
-    ...(userId === ADMIN_ID ? [{ id: 'admin' as NavItem, label: 'Панель', icon: <ShieldCheck size={20}/> }] : []),
+  const navItems: { id: NavItem; label: string; icon: JSX.Element; badge?: number }[] = [
+    { id: 'home',          label: 'Главная',      icon: <HomeIcon size={20}/> },
+    { id: 'categories',    label: 'Категории',    icon: <LayoutGrid size={20}/> },
+    { id: 'search',        label: 'Поиск',        icon: <Search size={20}/> },
+    { id: 'notifications', label: 'Уведомления',  icon: <Bell size={20}/>, badge: unreadCount },
+    { id: 'profile',       label: 'Профиль',      icon: <User size={20}/> },
   ]
 
   const myPosts = posts.filter(p => p.mine)
@@ -385,6 +464,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   return (
     <div className="home-layout">
       {viewerImages.length > 0 && <ImageViewer imageUrls={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerImages([])}/>}
+
       <div className="home-inner">
         <aside className="sidebar">
           <nav className="sidebar-nav">
@@ -392,10 +472,16 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
               <button
                 key={item.id}
                 className={`nav-item${active === item.id ? ' nav-item--active' : ''}`}
-                onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null) }}
+                onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null); if (item.id === 'notifications') { setUnreadCount(0); localStorage.setItem('notif_last_read', new Date().toISOString()) } }}
+                style={{ position: 'relative' }}
               >
                 {item.icon}
                 <span>{item.label}</span>
+                {item.badge ? (
+                  <span style={{ position: 'absolute', top: 6, left: 26, minWidth: 17, height: 17, borderRadius: 10, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                ) : null}
               </button>
             ))}
           </nav>
@@ -435,6 +521,11 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                 onOpenPost={post => setSelectedPost(post)}
                 onOpenProfile={handleOpenProfile}
               />
+            ) : active === 'notifications' ? (
+              <NotificationsPage
+                onOpenProfile={handleOpenProfile}
+                onOpenPost={postId => { const p = posts.find(x => x.id === postId); if (p) setSelectedPost(p) }}
+              />
             ) : active === 'admin' ? (
               <AdminPanel/>
             ) : active === 'categories' ? (
@@ -457,6 +548,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                 onProfileUpdate={() => { if (userId) { loadProfile(userId); loadFollowCounts() } }}
                 myUserId={userId}
                 onOpenProfile={handleOpenProfile}
+                onOpenAdmin={userId === ADMIN_ID ? () => setActive('admin') : undefined}
               />
             ) : (
               <>
@@ -483,19 +575,21 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                         <div className="spinner"/>
                       </div>
                     ) : posts.map(post => (
-                      <PostCard
-                        key={post.id}
-                        post={post}
-                        myAvatarUrl={profile?.avatar_url}
-                        liked={likedIds.has(post.id)}
-                        onLike={() => toggleLike(post.id)}
-                        onVote={i => voteOnPoll(post.id, i)}
-                        onOpenPost={() => setSelectedPost(post)}
-                        onOpenProfile={handleOpenProfile}
-                        onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
-                        onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                        onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
-                      />
+                      <AnimatedPost key={post.id}>
+                        <PostCard
+                          post={post}
+                          myAvatarUrl={profile?.avatar_url}
+                          liked={likedIds.has(post.id)}
+                          onLike={() => toggleLike(post.id)}
+                          onVote={i => voteOnPoll(post.id, i)}
+                          onOpenPost={() => setSelectedPost(post)}
+                          onOpenProfile={handleOpenProfile}
+                          onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
+                          onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
+                          onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
+                          onView={id => setPosts(prev => prev.map(p => p.id === id ? { ...p, view_count: p.view_count + 1 } : p))}
+                        />
+                      </AnimatedPost>
                     ))}
                   </>
                 ) : (
@@ -503,19 +597,21 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                     <div className="profile-empty"><p>Нет постов из подписок</p></div>
                   ) : (
                     subscriptionPosts.map(post => (
-                      <PostCard
-                        key={post.id}
-                        post={post}
-                        myAvatarUrl={profile?.avatar_url}
-                        liked={likedIds.has(post.id)}
-                        onLike={() => toggleLike(post.id)}
-                        onVote={i => voteOnPoll(post.id, i)}
-                        onOpenPost={() => setSelectedPost(post)}
-                        onOpenProfile={handleOpenProfile}
-                        onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
-                        onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                        onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
-                      />
+                      <AnimatedPost key={post.id}>
+                        <PostCard
+                          post={post}
+                          myAvatarUrl={profile?.avatar_url}
+                          liked={likedIds.has(post.id)}
+                          onLike={() => toggleLike(post.id)}
+                          onVote={i => voteOnPoll(post.id, i)}
+                          onOpenPost={() => setSelectedPost(post)}
+                          onOpenProfile={handleOpenProfile}
+                          onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
+                          onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
+                          onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
+                          onView={id => setPosts(prev => prev.map(p => p.id === id ? { ...p, view_count: p.view_count + 1 } : p))}
+                        />
+                      </AnimatedPost>
                     ))
                   )
                 )}
@@ -538,10 +634,16 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
           <button
             key={item.id}
             className={`bottom-nav-item${active === item.id ? ' bottom-nav-item--active' : ''}`}
-            onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null) }}
+            onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null); if (item.id === 'notifications') { setUnreadCount(0); localStorage.setItem('notif_last_read', new Date().toISOString()) } }}
+            style={{ position: 'relative' }}
           >
             {item.icon}
             <span>{item.label}</span>
+            {item.badge ? (
+              <span style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(4px)', minWidth: 16, height: 16, borderRadius: 8, background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                {item.badge > 99 ? '99+' : item.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </nav>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { Trash2, Users, FileText, BarChart2, Ban, BadgeCheck, Pencil, X, Flag } from 'lucide-react'
+import { Trash2, Users, FileText, BarChart2, Ban, BadgeCheck, Pencil, X, Flag, Bell } from 'lucide-react'
 
 interface AdminPost {
   id: string
@@ -32,23 +32,35 @@ interface AdminReport {
   post_text: string
 }
 
-type Tab = 'stats' | 'posts' | 'users' | 'reports'
+interface AdminNotification {
+  id: string
+  title: string
+  body: string
+  created_at: string
+}
+
+type Tab = 'stats' | 'posts' | 'users' | 'reports' | 'notify'
 
 function AdminPanel() {
   const [tab, setTab] = useState<Tab>('stats')
   const [posts, setPosts] = useState<AdminPost[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [reports, setReports] = useState<AdminReport[]>([])
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
   const [stats, setStats] = useState({ posts: 0, users: 0, likes: 0, comments: 0 })
   const [loading, setLoading] = useState(true)
   const [editingPost, setEditingPost] = useState<AdminPost | null>(null)
   const [editText, setEditText] = useState('')
+  const [notifyTitle, setNotifyTitle] = useState('')
+  const [notifyBody, setNotifyBody] = useState('')
+  const [notifySending, setNotifySending] = useState(false)
 
   useEffect(() => { loadStats() }, [])
   useEffect(() => {
     if (tab === 'posts') loadPosts()
     else if (tab === 'users') loadUsers()
     else if (tab === 'reports') loadReports()
+    else if (tab === 'notify') loadNotifications()
   }, [tab])
 
   const loadStats = async () => {
@@ -107,6 +119,31 @@ function AdminPanel() {
     setLoading(false)
   }
 
+  const loadNotifications = async () => {
+    setLoading(true)
+    const { data } = await supabase.from('notifications').select('*').order('created_at', { ascending: false })
+    if (data) setNotifications(data)
+    setLoading(false)
+  }
+
+  const sendNotification = async () => {
+    if (!notifyTitle.trim() || !notifyBody.trim()) return
+    setNotifySending(true)
+    const { data, error } = await supabase.from('notifications').insert({ title: notifyTitle.trim(), body: notifyBody.trim() }).select().single()
+    if (error) { alert('Ошибка: ' + error.message) }
+    else if (data) {
+      setNotifications(prev => [data, ...prev])
+      setNotifyTitle('')
+      setNotifyBody('')
+    }
+    setNotifySending(false)
+  }
+
+  const deleteNotification = async (id: string) => {
+    await supabase.from('notifications').delete().eq('id', id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
   const deleteReport = async (id: string) => {
     await supabase.from('reports').delete().eq('id', id)
     setReports(prev => prev.filter(r => r.id !== id))
@@ -152,6 +189,7 @@ function AdminPanel() {
     { id: 'posts',   label: 'Посты',      icon: <FileText size={15}/> },
     { id: 'users',   label: 'Юзеры',      icon: <Users size={15}/> },
     { id: 'reports', label: 'Жалобы',     icon: <Flag size={15}/> },
+    { id: 'notify',  label: 'Рассылка',   icon: <Bell size={15}/> },
   ]
 
   return (
@@ -268,6 +306,51 @@ function AdminPanel() {
               </button>
             </div>
           ))}
+        </div>
+
+      ) : tab === 'notify' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 14 }}>Новое уведомление</div>
+            <input
+              placeholder="Заголовок"
+              value={notifyTitle}
+              onChange={e => setNotifyTitle(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+            />
+            <textarea
+              placeholder="Текст сообщения"
+              value={notifyBody}
+              onChange={e => setNotifyBody(e.target.value)}
+              rows={4}
+              style={{ width: '100%', padding: '10px 14px', background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 14 }}
+            />
+            <button
+              onClick={sendNotification}
+              disabled={notifySending || !notifyTitle.trim() || !notifyBody.trim()}
+              style={{ width: '100%', padding: '11px', borderRadius: 14, border: 'none', background: notifyTitle.trim() && notifyBody.trim() ? '#fff' : 'rgba(255,255,255,0.15)', color: notifyTitle.trim() && notifyBody.trim() ? '#151518' : 'rgba(255,255,255,0.4)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: notifyTitle.trim() && notifyBody.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
+            >
+              {notifySending ? 'Отправка…' : 'Разослать всем'}
+            </button>
+          </div>
+          {notifications.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', paddingLeft: 4 }}>История рассылок</div>
+              {notifications.map(n => (
+                <div key={n.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 3 }}>{n.title}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 4, whiteSpace: 'pre-wrap' }}>{n.body}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
+                  </div>
+                  <button onClick={() => deleteNotification(n.id)}
+                    style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <X size={14}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       ) : (

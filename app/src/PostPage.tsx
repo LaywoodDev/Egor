@@ -78,9 +78,6 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
   const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
-    supabase.rpc('increment_view_count', { post_id: post.id }).then(({ error }) => {
-      if (error) console.error('increment_view_count error:', error)
-    })
     onView?.(post.id)
   }, [post.id])
 

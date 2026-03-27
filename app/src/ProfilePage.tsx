@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Eye, MessageCircle } from 'lucide-react'
+import { Eye, MessageCircle, ShieldCheck } from 'lucide-react'
 import ImageViewer from './ImageViewer'
 import type { Post } from './Home'
 import PostMenu from './PostMenu'
@@ -44,6 +44,7 @@ interface Props {
   onProfileUpdate: () => void
   myUserId?: string
   onOpenProfile?: (userId: string) => void
+  onOpenAdmin?: () => void
 }
 
 function formatRegDate(iso: string) {
@@ -70,7 +71,7 @@ function parseImageUrl(imageUrl?: string): string[] {
   return [imageUrl]
 }
 
-function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, followersCount, followingCount, onProfileUpdate, myUserId, onOpenProfile }: Props) {
+function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, followersCount, followingCount, onProfileUpdate, myUserId, onOpenProfile, onOpenAdmin }: Props) {
   const [tab, setTab] = useState<Tab>('posts')
   const [showSettings, setShowSettings] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
@@ -147,7 +148,14 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
           </div>
           <span className="profile-online" />
         </div>
-        <button className="profile-edit-btn" onClick={() => setShowSettings(true)}>Редактировать</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 52 }}>
+          {onOpenAdmin && (
+            <button onClick={onOpenAdmin} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 12px', borderRadius: 18, border: 'none', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: -8 }}>
+              <ShieldCheck size={17}/>
+            </button>
+          )}
+          <button className="profile-edit-btn" onClick={() => setShowSettings(true)}>Редактировать</button>
+        </div>
       </div>
 
       {/* Info – outside card */}

@@ -2,7 +2,7 @@ const COMBINED_REGEX = /(https?:\/\/[^\s<>"]+|@[a-zA-Z0-9_]+)/g
 
 export function linkify(text: string, onMentionClick?: (username: string) => void) {
   const parts = text.split(COMBINED_REGEX)
-  return parts.map((part, i) => {
+  return <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{parts.map((part, i) => {
     if (/^https?:\/\//.test(part)) {
       return (
         <a
@@ -31,5 +31,5 @@ export function linkify(text: string, onMentionClick?: (username: string) => voi
       )
     }
     return part
-  })
+  })}</span>
 }

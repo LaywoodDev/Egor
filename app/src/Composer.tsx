@@ -48,6 +48,13 @@ function Composer({ avatarUrl, onPublish }: Props) {
     }, 200)
   }, [mentionQuery])
 
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = ta.scrollHeight + 'px'
+  }, [text])
+
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setText(val)
@@ -76,8 +83,9 @@ function Composer({ avatarUrl, onPublish }: Props) {
     }, 0)
   }
 
+  const TEXT_LIMIT = 500
   const validPoll = pollOptions.filter(o => o.trim())
-  const hasContent = text.trim() || imageFiles.length > 0 || (pollMode && validPoll.length >= 2)
+  const hasContent = (text.trim() || imageFiles.length > 0 || (pollMode && validPoll.length >= 2)) && text.length <= TEXT_LIMIT
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -149,6 +157,11 @@ function Composer({ avatarUrl, onPublish }: Props) {
             onKeyDown={handleKey}
             rows={1}
           />
+          {text.length > 0 && (
+            <div style={{ textAlign: 'right', fontSize: 12, marginTop: 4, color: text.length > TEXT_LIMIT ? '#ef4444' : text.length > TEXT_LIMIT * 0.8 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)' }}>
+              {text.length}/{TEXT_LIMIT}
+            </div>
+          )}
           {mentionResults.length > 0 && (
             <div className="mention-dropdown">
               {mentionResults.map(u => (

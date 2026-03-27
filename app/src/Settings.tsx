@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { User, Image, X, Check, ShieldCheck, CheckCircle, Lock, ChevronDown } from 'lucide-react'
+import { User, Image, X, Check, ShieldCheck, CheckCircle, Lock, ChevronDown, Bell } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 interface Profile {
@@ -11,6 +11,10 @@ interface Profile {
   bio?: string
   likes_visibility?: string
   mentions_visibility?: string
+  notif_enabled?: boolean
+  notif_likes?: boolean
+  notif_comments?: boolean
+  notif_mentions?: boolean
 }
 
 interface Props {
@@ -19,7 +23,7 @@ interface Props {
   onSaved: () => void
 }
 
-type Section = 'account' | 'media' | 'security' | 'privacy'
+type Section = 'account' | 'media' | 'security' | 'privacy' | 'notifications'
 
 function Settings({ profile, onClose, onSaved }: Props) {
   const [section, setSection] = useState<Section>('account')
@@ -44,6 +48,12 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const [mentionsVisibility, setMentionsVisibility] = useState(profile?.mentions_visibility ?? 'everyone')
   const [mentionsMenuOpen, setMentionsMenuOpen] = useState(false)
   const mentionsMenuRef = useRef<HTMLDivElement>(null)
+
+  // Notifications
+  const [notifEnabled, setNotifEnabled] = useState(profile?.notif_enabled ?? true)
+  const [notifLikes, setNotifLikes] = useState(profile?.notif_likes ?? true)
+  const [notifComments, setNotifComments] = useState(profile?.notif_comments ?? true)
+  const [notifMentions, setNotifMentions] = useState(profile?.notif_mentions ?? true)
 
   // Security
   const [pwdError, setPwdError] = useState('')
@@ -161,13 +171,14 @@ function Settings({ profile, onClose, onSaved }: Props) {
   }
 
   const navItems: { id: Section; label: string; icon: JSX.Element }[] = [
-    { id: 'account',  label: 'Аккаунт',      icon: <User size={18} strokeWidth={1.8}/> },
-    { id: 'media',    label: 'Медиа',         icon: <Image size={18} strokeWidth={1.8}/> },
-    { id: 'privacy',  label: 'Приватность',   icon: <Lock size={18} strokeWidth={1.8}/> },
-    { id: 'security', label: 'Безопасность',  icon: <ShieldCheck size={18} strokeWidth={1.8}/> },
+    { id: 'account',       label: 'Аккаунт',      icon: <User size={18} strokeWidth={1.8}/> },
+    { id: 'media',         label: 'Медиа',         icon: <Image size={18} strokeWidth={1.8}/> },
+    { id: 'notifications', label: 'Уведомления',   icon: <Bell size={18} strokeWidth={1.8}/> },
+    { id: 'privacy',       label: 'Приватность',   icon: <Lock size={18} strokeWidth={1.8}/> },
+    { id: 'security',      label: 'Безопасность',  icon: <ShieldCheck size={18} strokeWidth={1.8}/> },
   ]
 
-  const sectionTitle = { account: 'Аккаунт', media: 'Медиа', privacy: 'Приватность', security: 'Безопасность' }
+  const sectionTitle = { account: 'Аккаунт', media: 'Медиа', notifications: 'Уведомления', privacy: 'Приватность', security: 'Безопасность' }
 
   return (
     <div className="settings-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -384,6 +395,72 @@ function Settings({ profile, onClose, onSaved }: Props) {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {section === 'notifications' && (
+            <div className="settings-fields">
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Уведомления</span>
+                  <span className="settings-row-hint">Включить или отключить все уведомления</span>
+                </div>
+                <label className="settings-toggle">
+                  <input type="checkbox" checked={notifEnabled} onChange={async e => {
+                    setNotifEnabled(e.target.checked)
+                    await saveFields({ notif_enabled: e.target.checked })
+                  }}/>
+                  <span className="settings-toggle-track"/>
+                </label>
+              </div>
+
+              <div className="settings-divider"/>
+
+              <div className="settings-row" style={{ opacity: notifEnabled ? 1 : 0.4, pointerEvents: notifEnabled ? 'auto' : 'none' }}>
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Лайки</span>
+                  <span className="settings-row-hint">Когда кто-то лайкает ваш пост</span>
+                </div>
+                <label className="settings-toggle">
+                  <input type="checkbox" checked={notifLikes} onChange={async e => {
+                    setNotifLikes(e.target.checked)
+                    await saveFields({ notif_likes: e.target.checked })
+                  }}/>
+                  <span className="settings-toggle-track"/>
+                </label>
+              </div>
+
+              <div className="settings-divider" style={{ opacity: notifEnabled ? 1 : 0.4 }}/>
+
+              <div className="settings-row" style={{ opacity: notifEnabled ? 1 : 0.4, pointerEvents: notifEnabled ? 'auto' : 'none' }}>
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Комментарии</span>
+                  <span className="settings-row-hint">Когда кто-то комментирует ваш пост</span>
+                </div>
+                <label className="settings-toggle">
+                  <input type="checkbox" checked={notifComments} onChange={async e => {
+                    setNotifComments(e.target.checked)
+                    await saveFields({ notif_comments: e.target.checked })
+                  }}/>
+                  <span className="settings-toggle-track"/>
+                </label>
+              </div>
+
+              <div className="settings-divider" style={{ opacity: notifEnabled ? 1 : 0.4 }}/>
+
+              <div className="settings-row" style={{ opacity: notifEnabled ? 1 : 0.4, pointerEvents: notifEnabled ? 'auto' : 'none' }}>
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Упоминания</span>
+                  <span className="settings-row-hint">Когда кто-то отмечает вас через @</span>
+                </div>
+                <label className="settings-toggle">
+                  <input type="checkbox" checked={notifMentions} onChange={async e => {
+                    setNotifMentions(e.target.checked)
+                    await saveFields({ notif_mentions: e.target.checked })
+                  }}/>
+                  <span className="settings-toggle-track"/>
+                </label>
               </div>
             </div>
           )}
