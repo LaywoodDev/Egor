@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, X, Eye, MessageCircle } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import type { Post } from './Home'
+import { linkify } from './linkify'
+import { openMention } from './mentionHelper'
 
 interface Profile {
   id: string
@@ -133,7 +135,7 @@ function SearchPage({ onOpenPost, onOpenProfile }: Props) {
                       </div>
                       <div className="result-user-info">
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <span className="result-user-name">{user.display_name}</span>
+                          <span className={`result-user-name${user.verified ? ' verified-name' : ''}`}>{user.display_name}</span>
                           {user.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </span>
                         <span className="result-user-meta">@{user.username}</span>
@@ -157,13 +159,13 @@ function SearchPage({ onOpenPost, onOpenProfile }: Props) {
                         </div>
                         <div className="post-meta">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <span className="post-username">{post.display_name || post.username}</span>
+                            <span className={`post-username${post.verified ? ' verified-name' : ''}`}>{post.display_name || post.username}</span>
                             {post.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                           </span>
                           <span className="post-time">{timeAgo(post.created_at)}</span>
                         </div>
                       </div>
-                      {post.text && <p className="post-text">{post.text}</p>}
+                      {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
                       <div className="post-footer" onClick={e => e.stopPropagation()}>
                         <div className="post-footer-left">
                           <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>

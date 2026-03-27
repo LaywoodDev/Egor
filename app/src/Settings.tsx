@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { User, Image, X, Check } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { User, Image, X, Check, ShieldCheck, CheckCircle, Lock, ChevronDown } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 interface Profile {
@@ -9,6 +9,8 @@ interface Profile {
   avatar_url?: string
   banner_url?: string
   bio?: string
+  likes_visibility?: string
+  mentions_visibility?: string
 }
 
 interface Props {
@@ -17,7 +19,7 @@ interface Props {
   onSaved: () => void
 }
 
-type Section = 'account' | 'media'
+type Section = 'account' | 'media' | 'security' | 'privacy'
 
 function Settings({ profile, onClose, onSaved }: Props) {
   const [section, setSection] = useState<Section>('account')
@@ -34,6 +36,37 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const bannerRef = useRef<HTMLInputElement>(null)
 
   const [saved, setSaved] = useState(false)
+
+  // Privacy
+  const [likesVisibility, setLikesVisibility] = useState(profile?.likes_visibility ?? 'everyone')
+  const [likesMenuOpen, setLikesMenuOpen] = useState(false)
+  const likesMenuRef = useRef<HTMLDivElement>(null)
+  const [mentionsVisibility, setMentionsVisibility] = useState(profile?.mentions_visibility ?? 'everyone')
+  const [mentionsMenuOpen, setMentionsMenuOpen] = useState(false)
+  const mentionsMenuRef = useRef<HTMLDivElement>(null)
+
+  // Security
+  const [pwdError, setPwdError] = useState('')
+  const [pwdLoading, setPwdLoading] = useState(false)
+  const [pwdSuccess, setPwdSuccess] = useState(false)
+
+  useEffect(() => {
+    if (!likesMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (likesMenuRef.current && !likesMenuRef.current.contains(e.target as Node)) setLikesMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [likesMenuOpen])
+
+  useEffect(() => {
+    if (!mentionsMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (mentionsMenuRef.current && !mentionsMenuRef.current.contains(e.target as Node)) setMentionsMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mentionsMenuOpen])
 
   const flashSaved = () => {
     setSaved(true)
@@ -72,6 +105,8 @@ function Settings({ profile, onClose, onSaved }: Props) {
     await saveFields({ username: username.trim().toLowerCase() })
   }
 
+  const BIO_LIMIT = 200
+
   const handleBioBlur = async () => {
     await saveFields({ bio: bio.trim() || null })
   }
@@ -108,13 +143,41 @@ function Settings({ profile, onClose, onSaved }: Props) {
     flashSaved()
   }
 
+  const [pwdToastExiting, setPwdToastExiting] = useState(false)
+
+  const handleChangePassword = async () => {
+    setPwdError('')
+    setPwdLoading(true)
+    const user = await getUser()
+    if (!user?.email) { setPwdError('Ошибка авторизации'); setPwdLoading(false); return }
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email)
+    setPwdLoading(false)
+    if (error) { setPwdError(error.message); return }
+    setPwdSuccess(true)
+    setTimeout(() => {
+      setPwdToastExiting(true)
+      setTimeout(() => { setPwdSuccess(false); setPwdToastExiting(false) }, 300)
+    }, 2500)
+  }
+
   const navItems: { id: Section; label: string; icon: JSX.Element }[] = [
-    { id: 'account', label: 'Аккаунт', icon: <User size={18} strokeWidth={1.8}/> },
-    { id: 'media',   label: 'Медиа',   icon: <Image size={18} strokeWidth={1.8}/> },
+    { id: 'account',  label: 'Аккаунт',      icon: <User size={18} strokeWidth={1.8}/> },
+    { id: 'media',    label: 'Медиа',         icon: <Image size={18} strokeWidth={1.8}/> },
+    { id: 'privacy',  label: 'Приватность',   icon: <Lock size={18} strokeWidth={1.8}/> },
+    { id: 'security', label: 'Безопасность',  icon: <ShieldCheck size={18} strokeWidth={1.8}/> },
   ]
+
+  const sectionTitle = { account: 'Аккаунт', media: 'Медиа', privacy: 'Приватность', security: 'Безопасность' }
 
   return (
     <div className="settings-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      {pwdSuccess && (
+        <div className={`toast toast--success${pwdToastExiting ? ' toast--exit' : ''}`} style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
+          <CheckCircle size={18} strokeWidth={2}/>
+          <span>Письмо отправлено на вашу почту</span>
+          <button className="toast-close" onClick={() => { setPwdToastExiting(true); setTimeout(() => { setPwdSuccess(false); setPwdToastExiting(false) }, 300) }}><X size={14} strokeWidth={2}/></button>
+        </div>
+      )}
       <div className="settings-layout">
 
         <aside className="settings-sidebar">
@@ -133,11 +196,9 @@ function Settings({ profile, onClose, onSaved }: Props) {
           </nav>
         </aside>
 
-        <div className="settings-content" style={{ justifyContent: 'space-between' }}>
+        <div className="settings-content">
           <div className="settings-content-header">
-            <h3 className="settings-content-title">
-              {section === 'account' ? 'Аккаунт' : 'Медиа'}
-            </h3>
+            <h3 className="settings-content-title">{sectionTitle[section]}</h3>
             <div className="settings-header-right">
               {saved && (
                 <span className="settings-saved-badge">
@@ -195,14 +256,19 @@ function Settings({ profile, onClose, onSaved }: Props) {
                   <span className="settings-row-title">О себе</span>
                   <span className="settings-row-hint">Расскажите немного о себе</span>
                 </div>
-                <textarea
-                  className="settings-textarea"
-                  value={bio}
-                  onChange={e => setBio(e.target.value)}
-                  onBlur={handleBioBlur}
-                  placeholder="Напиши что-нибудь о себе..."
-                  rows={4}
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <textarea
+                    className="settings-textarea"
+                    value={bio}
+                    onChange={e => setBio(e.target.value.slice(0, BIO_LIMIT))}
+                    onBlur={handleBioBlur}
+                    placeholder="Напиши что-нибудь о себе..."
+                    rows={4}
+                  />
+                  <span style={{ position: 'absolute', bottom: 10, right: 12, fontSize: 12, color: bio.length >= BIO_LIMIT ? '#ef4444' : 'rgba(255,255,255,0.25)', pointerEvents: 'none' }}>
+                    {bio.length}/{BIO_LIMIT}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -247,6 +313,103 @@ function Settings({ profile, onClose, onSaved }: Props) {
               </div>
             </div>
           )}
+
+          {section === 'privacy' && (
+            <div className="settings-fields">
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Кто видит мои лайки</span>
+                  <span className="settings-row-hint">Кто может видеть вкладку «Лайки» в вашем профиле</span>
+                </div>
+                <div ref={likesMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    className="settings-select-btn"
+                    onClick={() => setLikesMenuOpen(v => !v)}
+                  >
+                    {({ everyone: 'Все', followers: 'Подписчики', mutual: 'Взаимные', nobody: 'Никто' } as Record<string,string>)[likesVisibility]}
+                    <ChevronDown size={14} strokeWidth={2} style={{ transition: 'transform 0.15s', transform: likesMenuOpen ? 'rotate(180deg)' : 'none' }}/>
+                  </button>
+                  {likesMenuOpen && (
+                    <div className="settings-select-menu">
+                      {([
+                        { value: 'everyone', label: 'Все' },
+                        { value: 'followers', label: 'Подписчики' },
+                        { value: 'mutual', label: 'Взаимные подписки' },
+                        { value: 'nobody', label: 'Никто' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.value}
+                          className={`settings-select-option${likesVisibility === opt.value ? ' settings-select-option--active' : ''}`}
+                          onClick={async () => { setLikesVisibility(opt.value); setLikesMenuOpen(false); await saveFields({ likes_visibility: opt.value }) }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-divider"/>
+
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Кто может отмечать меня</span>
+                  <span className="settings-row-hint">Кто может упоминать вас через @</span>
+                </div>
+                <div ref={mentionsMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    className="settings-select-btn"
+                    onClick={() => setMentionsMenuOpen(v => !v)}
+                  >
+                    {({ everyone: 'Все', followers: 'Подписчики', mutual: 'Взаимные', nobody: 'Никто' } as Record<string,string>)[mentionsVisibility]}
+                    <ChevronDown size={14} strokeWidth={2} style={{ transition: 'transform 0.15s', transform: mentionsMenuOpen ? 'rotate(180deg)' : 'none' }}/>
+                  </button>
+                  {mentionsMenuOpen && (
+                    <div className="settings-select-menu">
+                      {([
+                        { value: 'everyone', label: 'Все' },
+                        { value: 'followers', label: 'Подписчики' },
+                        { value: 'mutual', label: 'Взаимные подписки' },
+                        { value: 'nobody', label: 'Никто' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.value}
+                          className={`settings-select-option${mentionsVisibility === opt.value ? ' settings-select-option--active' : ''}`}
+                          onClick={async () => { setMentionsVisibility(opt.value); setMentionsMenuOpen(false); await saveFields({ mentions_visibility: opt.value }) }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {section === 'security' && (
+            <div className="settings-fields">
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-title">Пароль</span>
+                  <span className="settings-row-hint">Изменить пароль от аккаунта</span>
+                </div>
+                <div className="settings-row-input-wrap" style={{ alignItems: 'flex-end' }}>
+                  <button
+                    className="submit-btn"
+                    style={{ width: '160px', padding: '8px 18px', fontSize: 13 }}
+                    onClick={handleChangePassword}
+                    disabled={pwdLoading}
+                  >
+                    {pwdLoading ? 'Отправка...' : 'Сменить пароль'}
+                  </button>
+                  {pwdError && <span className="error-text" style={{ marginTop: 6 }}>{pwdError}</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="settings-danger-zone">
             <button className="settings-delete-btn">Удалить аккаунт</button>
           </div>

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
-import { ChevronLeft, Eye, MessageCircle } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { ChevronLeft, Eye, MessageCircle, Search, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import type { Post, Poll } from './Home'
 import { CATEGORIES } from './Categories'
+import { linkify } from './linkify'
+import { openMention } from './mentionHelper'
 import ImageViewer from './ImageViewer'
 import PostMenu from './PostMenu'
 
@@ -70,8 +72,14 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [filter, setFilter] = useState<SortFilter>('new')
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const cat = CATEGORIES.find(c => c.id === categoryId)
+
+  const filteredPosts = query.trim()
+    ? posts.filter(p => p.text?.toLowerCase().includes(query.trim().toLowerCase()))
+    : posts
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -135,7 +143,7 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
           <span className="post-page-title">{cat?.name}</span>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {(['new', 'popular'] as SortFilter[]).map(f => (
             <button
               key={f}
@@ -150,16 +158,31 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
               {f === 'new' ? 'Новые' : 'Популярные'}
             </button>
           ))}
+          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.07)', borderRadius: 18, padding: '7px 14px', gap: 7, flex: 1 }}>
+            <Search size={14} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Поиск в категории..."
+              style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit', width: '100%' }}
+            />
+            {query && (
+              <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, display: 'flex' }}>
+                <X size={13}/>
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
             <div className="spinner"/>
           </div>
-        ) : posts.length === 0 ? (
-          <div className="profile-empty"><p>Нет постов в этой категории</p></div>
+        ) : filteredPosts.length === 0 ? (
+          <div className="profile-empty"><p>{query ? 'Ничего не найдено' : 'Нет постов в этой категории'}</p></div>
         ) : (
-          posts.map(post => {
+          filteredPosts.map(post => {
             const imageUrls = parseImageUrl(post.image_url)
             return (
               <div key={post.id} className="card post" style={{ cursor: 'pointer' }} onClick={() => onOpenPost(post)}>
@@ -174,9 +197,9 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
                     <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
                     <span className="post-time">{timeAgo(post.created_at)}</span>
                   </div>
-                  <PostMenu post={post} onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))} onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}/>
+                  <PostMenu post={post} onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))} onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}/>
                 </div>
-                {post.text && <p className="post-text">{post.text}</p>}
+                {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
                 {imageUrls.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                     {imageUrls.map((url, i) => (

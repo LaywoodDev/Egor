@@ -15,6 +15,7 @@ type Page = 'signin' | 'signup' | 'verify' | 'forgot' | 'forgot-verify' | 'reset
 
 function App() {
   const [page, setPage] = useState<Page>('signup')
+  const [prevPage, setPrevPage] = useState<Page>('signup')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -98,11 +99,11 @@ function App() {
   }
 
   if (page === 'terms') {
-    return <TermsPage onBack={() => setPage('signup')} />
+    return <TermsPage onBack={() => setPage(prevPage)} />
   }
 
   if (page === 'privacy') {
-    return <PrivacyPage onBack={() => setPage('signup')} />
+    return <PrivacyPage onBack={() => setPage(prevPage)} />
   }
 
   if (page === 'onboarding') {
@@ -128,15 +129,15 @@ function App() {
   }
 
   if (page === 'home') {
-    return <Home onLogout={handleLogout} />
+    return <Home onLogout={handleLogout} onOpenTerms={() => { setPrevPage('home'); setPage('terms') }} onOpenPrivacy={() => { setPrevPage('home'); setPage('privacy') }} />
   }
 
   return page === 'signup'
     ? <SignUp
         onGoSignIn={() => setPage('signin')}
         onSuccess={e => { setEmail(e); setPage('verify') }}
-        onOpenTerms={() => setPage('terms')}
-        onOpenPrivacy={() => setPage('privacy')}
+        onOpenTerms={() => { setPrevPage('signup'); setPage('terms') }}
+        onOpenPrivacy={() => { setPrevPage('signup'); setPage('privacy') }}
       />
     : <SignIn onGoSignUp={() => setPage('signup')} onForgot={() => setPage('forgot')} onSuccess={() => setPage('home')} />
 }

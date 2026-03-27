@@ -42,8 +42,42 @@ body {
 .home-inner {
   display: flex;
   width: 100%;
-  max-width: 900px;
+  max-width: 980px;
   height: 100%;
+}
+
+/* Right sidebar */
+.right-sidebar {
+  width: 160px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 24px 16px;
+  height: 100%;
+}
+
+.right-sidebar-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.right-sidebar-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.right-sidebar-link:hover {
+  color: rgba(255, 255, 255, 0.65);
 }
 
 /* Sidebar */
@@ -246,6 +280,21 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: #ffffff;
+}
+
+@keyframes verified-shimmer {
+  0%   { background-position: 0% 50% }
+  50%  { background-position: 100% 50% }
+  100% { background-position: 0% 50% }
+}
+
+.verified-name {
+  background: linear-gradient(90deg, #1d8ef5, #56cfff, #1da1f2, #7dd3fc, #1d8ef5);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: verified-shimmer 3s ease infinite;
 }
 
 .post-time {
@@ -995,6 +1044,15 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   font-weight: 600;
 }
 
+.profile-bio {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .profile-registered {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.35);
@@ -1658,6 +1716,46 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   border-radius: 12px;
   display: block;
 }
+.mention-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1a1a1e;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 200;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 4px;
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+.mention-option:hover { background: rgba(255,255,255,0.06); }
+
+.mention-option-name {
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 500;
+}
+.mention-option-username {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  margin-left: auto;
+}
+
 .composer-remove-img {
   position: absolute;
   top: 6px;
@@ -1869,7 +1967,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .settings-content-title {
@@ -1914,6 +2012,14 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+}
+
+.settings-row--column .settings-row-label {
+  width: auto;
+}
+
+.settings-row--column > div:last-child {
+  width: 100%;
 }
 
 .settings-row-label {
@@ -1966,7 +2072,9 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 
 .settings-textarea {
   width: 100%;
+  min-height: 120px;
   padding: 12px 16px;
+  padding-bottom: 28px;
   background: #28282e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
@@ -1976,6 +2084,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   outline: none;
   resize: vertical;
   line-height: 1.5;
+  box-sizing: border-box;
   transition: border-color 0.2s;
 }
 
@@ -1996,10 +2105,137 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   background: rgba(255, 255, 255, 0.07);
 }
 
+/* Toggle */
+.settings-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.settings-select-btn:hover { color: rgba(255,255,255,0.75); }
+
+.settings-select-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #1a1a1e;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  z-index: 100;
+  min-width: 180px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  padding: 6px;
+}
+
+.settings-select-option {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.6);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.settings-select-option:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.settings-select-option--active { color: #ffffff; font-weight: 600; }
+
+.settings-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.settings-radio-row:last-child { border-bottom: none; }
+
+.settings-radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.settings-radio-row:hover .settings-radio-dot { border-color: rgba(255,255,255,0.5); }
+
+.settings-radio-dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+.settings-radio-row:has(.settings-radio-dot-inner) .settings-radio-dot { border-color: #ffffff; }
+
+.settings-radio-label {
+  font-size: 15px;
+  color: rgba(255,255,255,0.85);
+}
+
+.settings-toggle {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.settings-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-toggle-track {
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.settings-toggle input:checked + .settings-toggle-track {
+  background: #6d28d9;
+}
+
+.settings-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.settings-toggle input:checked ~ .settings-toggle-track .settings-toggle-thumb {
+  transform: translateX(20px);
+}
+
 .settings-danger-zone {
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
-  margin-top: auto;
+  margin-top: 24px;
 }
 
 .settings-delete-btn {
@@ -2097,6 +2333,10 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 
 @media (max-width: 640px) {
   .sidebar {
+    display: none;
+  }
+
+  .right-sidebar {
     display: none;
   }
 

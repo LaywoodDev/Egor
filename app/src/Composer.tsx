@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Paperclip, BarChart2, X, Plus, LayoutGrid, HelpCircle, Laugh, Images, Video } from 'lucide-react'
 import { supabase } from './lib/supabase'
+
+interface MentionUser { id: string; username: string; display_name: string; avatar_url?: string }
 
 interface Props {
   avatarUrl?: string
@@ -26,6 +28,53 @@ function Composer({ avatarUrl, onPublish }: Props) {
   const [pollOptions, setPollOptions] = useState(['', ''])
   const [category, setCategory] = useState<string | undefined>(undefined)
   const [catOpen, setCatOpen] = useState(false)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionStart, setMentionStart] = useState(0)
+  const [mentionResults, setMentionResults] = useState<MentionUser[]>([])
+  const mentionDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (mentionQuery === null || mentionQuery.length === 0) { setMentionResults([]); return }
+    if (mentionDebounce.current) clearTimeout(mentionDebounce.current)
+    mentionDebounce.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .ilike('username', `${mentionQuery}%`)
+        .limit(5)
+      setMentionResults(data ?? [])
+    }, 200)
+  }, [mentionQuery])
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setText(val)
+    const pos = e.target.selectionStart ?? val.length
+    const before = val.slice(0, pos)
+    const match = before.match(/@([a-zA-Z0-9_]*)$/)
+    if (match) {
+      setMentionStart(pos - match[0].length)
+      setMentionQuery(match[1])
+    } else {
+      setMentionQuery(null)
+      setMentionResults([])
+    }
+  }
+
+  const insertMention = (username: string) => {
+    const pos = textareaRef.current?.selectionStart ?? text.length
+    const newText = `${text.slice(0, mentionStart)}@${username} ${text.slice(pos)}`
+    setText(newText)
+    setMentionQuery(null)
+    setMentionResults([])
+    setTimeout(() => {
+      const newPos = mentionStart + username.length + 2
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(newPos, newPos)
+    }, 0)
+  }
 
   const validPoll = pollOptions.filter(o => o.trim())
   const hasContent = text.trim() || imageFiles.length > 0 || (pollMode && validPoll.length >= 2)
@@ -90,14 +139,31 @@ function Composer({ avatarUrl, onPublish }: Props) {
             : <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="url(#cAv)"/><defs><radialGradient id="cAv" cx="30%" cy="30%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></radialGradient></defs></svg>
           }
         </div>
-        <textarea
-          className="composer-input composer-textarea"
-          placeholder="Что нового?"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={handleKey}
-          rows={1}
-        />
+        <div style={{ flex: 1, position: 'relative' }}>
+          <textarea
+            ref={textareaRef}
+            className="composer-input composer-textarea"
+            placeholder="Что нового?"
+            value={text}
+            onChange={handleTextChange}
+            onKeyDown={handleKey}
+            rows={1}
+          />
+          {mentionResults.length > 0 && (
+            <div className="mention-dropdown">
+              {mentionResults.map(u => (
+                <button key={u.id} className="mention-option" onMouseDown={e => { e.preventDefault(); insertMention(u.username) }}>
+                  {u.avatar_url
+                    ? <img src={u.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}/>
+                    : <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#3a3a44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>{u.display_name?.charAt(0).toUpperCase()}</span>
+                  }
+                  <span className="mention-option-name">{u.display_name}</span>
+                  <span className="mention-option-username">@{u.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {imagePreviews.length > 0 && (

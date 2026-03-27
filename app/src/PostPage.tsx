@@ -3,6 +3,8 @@ import { ChevronLeft, Eye } from 'lucide-react'
 import ImageViewer from './ImageViewer'
 import type { Post, Poll } from './Home'
 import CommentsSection from './CommentsSection'
+import { linkify } from './linkify'
+import { openMention } from './mentionHelper'
 import { supabase } from './lib/supabase'
 import PostMenu from './PostMenu'
 
@@ -15,7 +17,7 @@ interface Props {
   onVote: (i: number) => void
   onOpenProfile: (userId: string) => void
   onDelete?: (id: string) => void
-  onEdit?: (id: string, text: string) => void
+  onEdit?: (id: string, text: string, image_url?: string) => void
   onView?: (id: string) => void
 }
 
@@ -76,7 +78,9 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
   const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
-    supabase.rpc('increment_view_count', { post_id: post.id })
+    supabase.rpc('increment_view_count', { post_id: post.id }).then(({ error }) => {
+      if (error) console.error('increment_view_count error:', error)
+    })
     onView?.(post.id)
   }, [post.id])
 
@@ -105,7 +109,7 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
           </div>
           <div className="post-meta">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
+              <span className={`post-username${post.verified ? ' verified-name' : ''}`} style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
               {post.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
             </span>
             <span className="post-time">{timeAgo(post.created_at)}</span>
@@ -117,7 +121,7 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
           </div>
           <PostMenu post={post} onDelete={onDelete} onEdit={onEdit}/>
         </div>
-        {post.text && <p className="post-text">{post.text}</p>}
+        {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
         {imageUrls.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }}>
             {imageUrls.map((url, i) => (

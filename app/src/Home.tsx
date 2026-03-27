@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Home as HomeIcon, LayoutGrid, Search, User, LogOut, MessageCircle, Eye, ShieldCheck } from 'lucide-react'
+import { linkify } from './linkify'
+import { openMention } from './mentionHelper'
 import PostPage from './PostPage'
 import PostMenu from './PostMenu'
 import { supabase } from './lib/supabase'
@@ -16,6 +18,8 @@ const ADMIN_ID = '20111c2e-e9c9-4e16-aba4-d7364aa98204'
 
 interface Props {
   onLogout: () => void
+  onOpenTerms: () => void
+  onOpenPrivacy: () => void
 }
 
 export interface Poll {
@@ -49,6 +53,7 @@ interface Profile {
   banner_url?: string
   bio?: string
   verified?: boolean
+  likes_visibility?: string
 }
 
 function timeAgo(iso: string) {
@@ -122,7 +127,7 @@ function parseImageUrl(imageUrl?: string): string[] {
 }
 
 function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpenProfile, onOpenImage, onDelete, onEdit }: {
-  post: Post; liked: boolean; onLike: () => void; myAvatarUrl?: string; onVote: (i: number) => void; onOpenPost: () => void; onOpenProfile: (userId: string) => void; onOpenImage: (urls: string[], index: number) => void; onDelete: (id: string) => void; onEdit?: (id: string, text: string) => void
+  post: Post; liked: boolean; onLike: () => void; myAvatarUrl?: string; onVote: (i: number) => void; onOpenPost: () => void; onOpenProfile: (userId: string) => void; onOpenImage: (urls: string[], index: number) => void; onDelete: (id: string) => void; onEdit?: (id: string, text: string, image_url?: string) => void
 }) {
   const imageUrls = parseImageUrl(post.image_url)
 
@@ -137,7 +142,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
         </div>
         <div className="post-meta">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username || 'Пользователь'}</span>
+            <span className={`post-username${post.verified ? ' verified-name' : ''}`} style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username || 'Пользователь'}</span>
             {post.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           </span>
           <span className="post-time">{timeAgo(post.created_at)}</span>
@@ -149,7 +154,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
         </div>
         <PostMenu post={post} onDelete={onDelete} onEdit={onEdit}/>
       </div>
-      {post.text && <p className="post-text">{post.text}</p>}
+      {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
       {imageUrls.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
           {imageUrls.map((url, i) => (
@@ -179,7 +184,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
 
 type NavItem = 'home' | 'categories' | 'search' | 'profile' | 'admin'
 
-function Home({ onLogout }: Props) {
+function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [active, setActive] = useState<NavItem>('home')
   const [homeTab, setHomeTab] = useState<'forYou' | 'subs'>('forYou')
   const [posts, setPosts] = useState<Post[]>([])
@@ -237,7 +242,7 @@ function Home({ onLogout }: Props) {
   const loadProfile = async (uid: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('display_name, username, created_at, avatar_url, banner_url, bio, verified')
+      .select('display_name, username, created_at, avatar_url, banner_url, bio, verified, likes_visibility')
       .eq('id', uid)
       .maybeSingle()
     if (!error && data) setProfile(data)
@@ -323,7 +328,7 @@ function Home({ onLogout }: Props) {
       const newPost: Post = {
         id: data.id, user_id: data.user_id, text: data.text,
         image_url: data.image_url, created_at: data.created_at,
-        like_count: 0, mine: true,
+        like_count: 0, view_count: 0, mine: true,
         display_name: data.profiles?.display_name ?? 'Пользователь',
         username: data.profiles?.username ?? '',
         poll: data.poll ? { options: data.poll.options, vote_counts: Array(data.poll.options.length).fill(0) } : undefined,
@@ -412,7 +417,7 @@ function Home({ onLogout }: Props) {
                 onVote={i => voteOnPoll(selectedPost.id, i)}
                 onOpenProfile={handleOpenProfile}
                 onDelete={id => { setPosts(prev => prev.filter(p => p.id !== id)); setSelectedPost(null) }}
-                onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
                 onView={id => setPosts(prev => prev.map(p => p.id === id ? { ...p, view_count: p.view_count + 1 } : p))}
               />
             ) : viewingUserId ? (
@@ -445,11 +450,13 @@ function Home({ onLogout }: Props) {
                 onVote={voteOnPoll}
                 onOpenPost={post => setSelectedPost(post)}
                 onDeletePost={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                onEditPost={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                onEditPost={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
                 profile={profile}
                 followersCount={followersCount}
                 followingCount={followingCount}
                 onProfileUpdate={() => { if (userId) { loadProfile(userId); loadFollowCounts() } }}
+                myUserId={userId}
+                onOpenProfile={handleOpenProfile}
               />
             ) : (
               <>
@@ -487,7 +494,7 @@ function Home({ onLogout }: Props) {
                         onOpenProfile={handleOpenProfile}
                         onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
                         onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                        onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                        onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
                       />
                     ))}
                   </>
@@ -507,7 +514,7 @@ function Home({ onLogout }: Props) {
                         onOpenProfile={handleOpenProfile}
                         onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
                         onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                        onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                        onEdit={(id, text, image_url) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p))}
                       />
                     ))
                   )
@@ -516,6 +523,13 @@ function Home({ onLogout }: Props) {
             )}
           </main>
         </div>
+
+        <aside className="right-sidebar">
+          <div className="right-sidebar-links">
+            <button className="right-sidebar-link" onClick={onOpenPrivacy}>Конфиденциальность</button>
+            <button className="right-sidebar-link" onClick={onOpenTerms}>Условия использования</button>
+          </div>
+        </aside>
       </div>
 
       {/* Bottom nav — mobile only */}

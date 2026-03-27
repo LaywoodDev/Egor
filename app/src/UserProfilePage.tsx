@@ -4,6 +4,9 @@ import ImageViewer from './ImageViewer'
 import { supabase } from './lib/supabase'
 import type { Post, Poll } from './Home'
 import PostMenu from './PostMenu'
+import FollowsModal from './FollowsModal'
+import { linkify } from './linkify'
+import { openMention } from './mentionHelper'
 
 interface Profile {
   display_name: string
@@ -14,6 +17,7 @@ interface Profile {
   bio?: string
   last_seen?: string
   verified?: boolean
+  likes_visibility?: string
 }
 
 interface Props {
@@ -93,8 +97,11 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [isFollowedBack, setIsFollowedBack] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
+  const [followsModal, setFollowsModal] = useState<'followers' | 'following' | null>(null)
+  const [profileReady, setProfileReady] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -104,12 +111,10 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
 
   useEffect(() => {
     setLoading(true)
+    setProfileReady(false)
     setPosts([])
     setProfile(null)
-    loadProfile()
-    loadPosts()
-    loadFollowCounts()
-    loadFollowState()
+    Promise.all([loadProfile(), loadFollowState(), loadFollowCounts(), loadPosts()]).then(() => setProfileReady(true))
   }, [userId])
 
   useEffect(() => {
@@ -117,13 +122,13 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
     supabase.from('likes').select('post_id').eq('user_id', myUserId).then(({ data }) => {
       if (data) setLikedIds(new Set(data.map((l: any) => l.post_id)))
     })
-    loadFollowState()
+    loadFollowState().then(() => setProfileReady(true))
   }, [myUserId])
 
   const loadProfile = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, username, created_at, avatar_url, banner_url, bio, last_seen, verified')
+      .select('display_name, username, created_at, avatar_url, banner_url, bio, last_seen, verified, likes_visibility')
       .eq('id', userId)
       .maybeSingle()
     if (data) setProfile(data)
@@ -177,14 +182,13 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
   }
 
   const loadFollowState = async () => {
-    if (!myUserId || myUserId === userId) { setIsFollowing(false); return }
-    const { data } = await supabase
-      .from('follows')
-      .select('id')
-      .eq('follower_id', myUserId)
-      .eq('following_id', userId)
-      .maybeSingle()
-    setIsFollowing(!!data)
+    if (!myUserId || myUserId === userId) { setIsFollowing(false); setIsFollowedBack(false); return }
+    const [{ data: fwd }, { data: back }] = await Promise.all([
+      supabase.from('follows').select('id').eq('follower_id', myUserId).eq('following_id', userId).maybeSingle(),
+      supabase.from('follows').select('id').eq('follower_id', userId).eq('following_id', myUserId).maybeSingle(),
+    ])
+    setIsFollowing(!!fwd)
+    setIsFollowedBack(!!back)
   }
 
   const toggleFollow = async () => {
@@ -236,6 +240,9 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
   return (
     <>
       {viewerImages.length > 0 && <ImageViewer imageUrls={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerImages([])}/>}
+      {followsModal && (
+        <FollowsModal userId={userId} type={followsModal} onClose={() => setFollowsModal(null)} onOpenProfile={onOpenProfile}/>
+      )}
       <div className="profile-page">
 
       <div className="post-page-header">
@@ -244,6 +251,12 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
         </button>
         <span className="post-page-title">Профиль</span>
       </div>
+
+      {!profileReady ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <div className="spinner"/>
+        </div>
+      ) : (<>
 
       <div className="profile-card">
         <div
@@ -284,7 +297,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
       <div className="profile-info">
         <div className="profile-name-row">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <span className="profile-name">{profile?.display_name || '—'}</span>
+            <span className={`profile-name${profile?.verified ? ' verified-name' : ''}`}>{profile?.display_name || '—'}</span>
             {profile?.verified && (
               <span className="verified-badge">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -295,30 +308,46 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
           <span className="profile-username">@{profile?.username || '—'}</span>
         </div>
         <div className="profile-stats">
-          <span><b>{followersCount}</b> подписчиков</span>
-          <span><b>{followingCount}</b> подписок</span>
+          <span style={{ cursor: 'pointer' }} onClick={() => setFollowsModal('followers')}><b>{followersCount}</b> подписчиков</span>
+          <span style={{ cursor: 'pointer' }} onClick={() => setFollowsModal('following')}><b>{followingCount}</b> подписок</span>
         </div>
+        {profile?.bio && (
+          <p className="profile-bio">{profile.bio}</p>
+        )}
         {profile?.created_at && (
           <p className="profile-registered">Регистрация: {formatRegDate(profile.created_at)}</p>
         )}
       </div>
 
-      <div className="profile-tabs-wrap">
-        <div className="profile-tabs">
-          <div
-            className="profile-tab-slider"
-            style={{ transform: `translateX(${tab === 'likes' ? '100%' : '0%'})` }}
-          />
-          <button className={`profile-tab${tab === 'posts' ? ' profile-tab--active' : ''}`} onClick={() => setTab('posts')}>
-            Посты
-          </button>
-          <button className={`profile-tab${tab === 'likes' ? ' profile-tab--active' : ''}`} onClick={() => setTab('likes')}>
-            Лайки
-          </button>
-        </div>
-      </div>
+      {(() => {
+        const v = profile?.likes_visibility ?? 'everyone'
+        const showLikes = v === 'everyone' || (v === 'followers' && isFollowing) || (v === 'mutual' && isFollowing && isFollowedBack)
+        return (
+          <div className="profile-tabs-wrap">
+            <div className="profile-tabs">
+              <div
+                className="profile-tab-slider"
+                style={{
+                  width: showLikes ? '50%' : '100%',
+                  transform: `translateX(${tab === 'likes' ? '100%' : '0%'})`
+                }}
+              />
+              <button className={`profile-tab${tab === 'posts' ? ' profile-tab--active' : ''}`} onClick={() => setTab('posts')}>
+                Посты
+              </button>
+              {showLikes && (
+                <button className={`profile-tab${tab === 'likes' ? ' profile-tab--active' : ''}`} onClick={() => setTab('likes')}>
+                  Лайки
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
-      {tab === 'posts' && (
+      </>)}
+
+      {profileReady && tab === 'posts' && (
         loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
             <div className="spinner"/>
@@ -338,12 +367,12 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
                   }
                 </div>
                 <div className="post-meta">
-                  <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
+                  <span className={`post-username${post.verified ? ' verified-name' : ''}`} style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
                   <span className="post-time">{timeAgo(post.created_at)}</span>
                 </div>
                 <PostMenu post={post} onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))} onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}/>
               </div>
-              {post.text && <p className="post-text">{post.text}</p>}
+              {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
               {imageUrls.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                   {imageUrls.map((url, i) => (
@@ -377,7 +406,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
         )
       )}
 
-      {tab === 'likes' && (
+      {profileReady && tab === 'likes' && (
         <div className="profile-empty"><p>Нет лайкнутых постов</p></div>
       )}
 
