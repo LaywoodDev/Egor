@@ -89,7 +89,7 @@ body {
 .nav-item--active {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .nav-item--active:hover {
@@ -128,6 +128,7 @@ body {
   background: #1e1e22;
   border-radius: 18px;
   padding: 18px;
+  touch-action: manipulation;
 }
 
 /* Composer */
@@ -483,6 +484,17 @@ body {
   padding-right: 52px;
 }
 
+/* Hide built-in password reveal icons (Edge/Chrome) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
 .eye-btn {
   position: absolute;
   right: 16px;
@@ -508,6 +520,91 @@ body {
   color: rgba(255, 255, 255, 0.5);
   line-height: 1.5;
   margin-bottom: 20px;
+}
+
+/* Legal pages */
+.legal-page {
+  min-height: 100svh;
+  background: #0e0e11;
+  padding: 32px 24px 80px;
+  color: #e5e7eb;
+}
+
+.legal-card {
+  width: min(680px, 100%);
+  margin: 0 auto;
+}
+
+.legal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 0;
+  margin-bottom: 28px;
+  letter-spacing: 0.01em;
+}
+
+.legal-back:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.legal-header {
+  margin-bottom: 24px;
+}
+
+.legal-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: #ffffff;
+}
+
+.legal-updated {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.legal-updated span {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.legal-section {
+  margin-top: 24px;
+}
+
+.legal-section h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.legal-section p,
+.legal-section li {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 6px;
+}
+
+.legal-section ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.legal-section ul li {
+  margin-bottom: 4px;
+}
+
+.legal-actions {
+  display: none;
 }
 
 .forgot-row {
@@ -751,7 +848,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   padding: 0 4px;
-  margin-top: -37px;
+  margin-top: -49px;
 }
 
 .profile-avatar-wrap {
@@ -767,6 +864,15 @@ body {
   border: 4px solid #1e1e22;
   overflow: hidden;
   background: #2a2a30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-online {
@@ -778,6 +884,35 @@ body {
   border-radius: 50%;
   background: #22c55e;
   border: 2px solid #1e1e22;
+}
+.profile-online--offline {
+  background: #6b7280;
+}
+
+.verified-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+}
+.verified-badge__tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2a2a32;
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.verified-badge:hover .verified-badge__tooltip {
+  opacity: 1;
 }
 
 .profile-edit-btn {
@@ -792,10 +927,36 @@ body {
   cursor: pointer;
   transition: opacity 0.15s;
   align-self: flex-end;
+  margin-bottom: -8px;
 }
 
 .profile-edit-btn:hover {
   opacity: 0.88;
+}
+
+.profile-follow-btn {
+  padding: 9px 20px;
+  border-radius: 18px;
+  border: none;
+  background: #ffffff;
+  color: #151518;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  align-self: flex-end;
+  margin-bottom: -8px;
+}
+
+.profile-follow-btn:hover {
+  opacity: 0.88;
+}
+
+.profile-follow-btn--active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .profile-info {
@@ -841,6 +1002,21 @@ body {
 
 .profile-tabs-wrap {
   padding: 0;
+}
+
+.home-tabs-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 4px;
+  padding: 4px 0 8px;
+  background: transparent;
+}
+
+.home-tabs-wrap .profile-tabs {
+  background: #1a1a1f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
 .profile-tabs {
@@ -1045,10 +1221,21 @@ body {
 
 .search-tabs {
   display: flex;
-  gap: 4px;
+  position: relative;
   background: #1e1e22;
   padding: 4px;
   border-radius: 14px;
+}
+
+.search-tab-slider {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: calc(33.333% - 2px);
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
 }
 
 .search-tab {
@@ -1062,11 +1249,12 @@ body {
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.2s;
+  position: relative;
+  z-index: 1;
 }
 
 .search-tab--active {
-  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
 }
 
@@ -1900,4 +2088,84 @@ body {
 @keyframes slideDown {
   from { opacity: 1; transform: translateX(-50%) translateY(0); }
   to   { opacity: 0; transform: translateX(-50%) translateY(20px); }
+}
+
+/* ── Mobile ── */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    display: none;
+  }
+
+  .home-layout {
+    flex-direction: column;
+  }
+
+  .feed-wrapper {
+    padding: 12px 10px;
+    padding-bottom: 80px;
+    height: 100svh;
+  }
+
+  .card {
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: #1a1a1e;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    z-index: 100;
+    padding: 0 8px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 6px 0;
+    transition: color 0.15s;
+  }
+
+  .bottom-nav-item--active {
+    color: #ffffff;
+  }
+
+  .post-page, .profile-page {
+    padding-bottom: 20px;
+  }
+
+  .profile-banner {
+    height: 90px;
+  }
+
+  .composer-expand-btn {
+    font-size: 13px;
+  }
+
+  .post-page-header {
+    position: sticky;
+    top: 0;
+    background: #151518;
+    z-index: 10;
+  }
 }

@@ -1,51 +1,89 @@
-import { useState } from 'react'
-import { Search, TrendingUp, Clock, X, User } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, X, Eye, MessageCircle } from 'lucide-react'
+import { supabase } from './lib/supabase'
+import type { Post } from './Home'
 
-const ALL_POSTS = [
-  { id: 1, username: 'Golhok228',   avatar: '✦', text: 'я очень люблю арбузы, рад что я не один такой', time: '1ч.', likes: 38 },
-  { id: 2, username: 'techgirl_99', avatar: '◈', text: 'Новый MacBook Pro просто космос, производительность на уровне', time: '2ч.', likes: 124 },
-  { id: 3, username: 'daun_egor',   avatar: '◉', text: 'Кто любит программировать по ночам? Я обожаю этот кайф', time: '3ч.', likes: 57 },
-  { id: 4, username: 'music_soul',  avatar: '♪', text: 'Новый альбом Radiohead — шедевр, слушаю уже третий раз подряд', time: '5ч.', likes: 89 },
-  { id: 5, username: 'sport_max',   avatar: '◆', text: 'Пробежал 10км за 42 минуты, личный рекорд!', time: '6ч.', likes: 203 },
-]
+interface Profile {
+  id: string
+  display_name: string
+  username: string
+  avatar_url?: string
+  verified?: boolean
+}
 
-const ALL_USERS = [
-  { id: 1, username: 'Golhok228',   name: 'Голышев Кирилл', avatar: '✦', followers: '1.2k' },
-  { id: 2, username: 'techgirl_99', name: 'Анна Техно',     avatar: '◈', followers: '4.8k' },
-  { id: 3, username: 'daun_egor',   name: 'Егор Давалкин',  avatar: '◉', followers: '892' },
-  { id: 4, username: 'music_soul',  name: 'Музыкальная душа', avatar: '♪', followers: '2.1k' },
-  { id: 5, username: 'sport_max',   name: 'Максим Спорт',   avatar: '◆', followers: '3.4k' },
-]
-
-const TRENDING = ['арбузы', 'технологии', 'музыка', 'программирование', 'спорт']
-const RECENT = ['daun_egor', 'MacBook', 'radiohead']
+interface Props {
+  onOpenPost: (post: Post) => void
+  onOpenProfile: (userId: string) => void
+}
 
 type Tab = 'all' | 'posts' | 'users'
 
-function SearchPage() {
+function timeAgo(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60) return 'только что'
+  if (diff < 3600) return `${Math.floor(diff / 60)}м.`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}ч.`
+  return `${Math.floor(diff / 86400)}д.`
+}
+
+function SearchPage({ onOpenPost, onOpenProfile }: Props) {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<Tab>('all')
-  const [recentSearches, setRecentSearches] = useState(RECENT)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [users, setUsers] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const q = query.trim().toLowerCase()
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) { setPosts([]); setUsers([]); return }
 
-  const filteredPosts = ALL_POSTS.filter(p =>
-    p.text.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
-  )
-  const filteredUsers = ALL_USERS.filter(u =>
-    u.username.toLowerCase().includes(q) || u.name.toLowerCase().includes(q)
-  )
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => search(q), 350)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [query])
 
-  const removeRecent = (item: string) =>
-    setRecentSearches(prev => prev.filter(r => r !== item))
+  const search = async (q: string) => {
+    setLoading(true)
+    const [{ data: postsData }, { data: usersData }] = await Promise.all([
+      supabase
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(display_name, username, avatar_url, verified), likes(id)')
+        .ilike('text', `%${q}%`)
+        .order('created_at', { ascending: false })
+        .limit(30),
+      supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url, verified')
+        .or(`display_name.ilike.%${q}%,username.ilike.%${q}%`)
+        .limit(20),
+    ])
 
-  const applyRecent = (item: string) => setQuery(item)
+    if (postsData) {
+      const { data: { user } } = await supabase.auth.getUser()
+      setPosts(postsData.map((p: any) => ({
+        id: p.id, user_id: p.user_id, text: p.text,
+        image_url: p.image_url, created_at: p.created_at,
+        like_count: p.likes?.length ?? 0, view_count: p.view_count ?? 0,
+        mine: p.user_id === user?.id,
+        display_name: p.profiles?.display_name ?? 'Пользователь',
+        username: p.profiles?.username ?? '',
+        avatar_url: p.profiles?.avatar_url,
+        verified: p.profiles?.verified ?? false,
+      })))
+    }
+    if (usersData) setUsers(usersData)
+    setLoading(false)
+  }
+
+  const q = query.trim()
+  const showPosts = tab === 'all' || tab === 'posts'
+  const showUsers = tab === 'all' || tab === 'users'
 
   return (
     <div className="search-page">
-      {/* Search bar */}
       <div className="search-bar-wrap">
-        <Search size={16} className="search-bar-icon" />
+        <Search size={16} className="search-bar-icon"/>
         <input
           className="search-bar-input"
           placeholder="Поиск постов, людей..."
@@ -55,112 +93,100 @@ function SearchPage() {
         />
         {query && (
           <button className="search-clear" onClick={() => setQuery('')}>
-            <X size={15} />
+            <X size={15}/>
           </button>
         )}
       </div>
 
       {!q ? (
-        /* Empty state — trending + recent */
         <div className="search-empty">
-          {recentSearches.length > 0 && (
-            <div className="search-section">
-              <div className="search-section-header">
-                <Clock size={14} />
-                <span>Недавние</span>
-              </div>
-              <div className="search-chips">
-                {recentSearches.map(item => (
-                  <div key={item} className="search-chip">
-                    <button className="search-chip-text" onClick={() => applyRecent(item)}>
-                      {item}
-                    </button>
-                    <button className="search-chip-remove" onClick={() => removeRecent(item)}>
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="search-section">
-            <div className="search-section-header">
-              <TrendingUp size={14} />
-              <span>В тренде</span>
-            </div>
-            <div className="search-chips">
-              {TRENDING.map(item => (
-                <button key={item} className="search-chip-btn" onClick={() => setQuery(item)}>
-                  #{item}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Search size={36} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.15)', margin: '40px auto 12px', display: 'block' }}/>
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Введите запрос для поиска</p>
         </div>
       ) : (
-        /* Results */
         <div className="search-results">
-          {/* Tabs */}
           <div className="search-tabs">
+            <div className="search-tab-slider" style={{ transform: `translateX(${tab === 'all' ? '0%' : tab === 'posts' ? '100%' : '200%'})` }}/>
             {(['all', 'posts', 'users'] as Tab[]).map(t => (
-              <button
-                key={t}
-                className={`search-tab${tab === t ? ' search-tab--active' : ''}`}
-                onClick={() => setTab(t)}
-              >
+              <button key={t} className={`search-tab${tab === t ? ' search-tab--active' : ''}`} onClick={() => setTab(t)}>
                 {t === 'all' ? 'Все' : t === 'posts' ? 'Посты' : 'Люди'}
               </button>
             ))}
           </div>
 
-          {(tab === 'all' || tab === 'users') && filteredUsers.length > 0 && (
-            <div className="result-section">
-              {tab === 'all' && <p className="result-section-label">Люди</p>}
-              {filteredUsers.map(user => (
-                <div key={user.id} className="result-user card">
-                  <div className="result-user-avatar">{user.avatar}</div>
-                  <div className="result-user-info">
-                    <span className="result-user-name">{user.name}</span>
-                    <span className="result-user-meta">@{user.username} · {user.followers} подписчиков</span>
-                  </div>
-                  <button className="follow-btn">
-                    <User size={14} />
-                    Подписаться
-                  </button>
-                </div>
-              ))}
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+              <div className="spinner"/>
             </div>
-          )}
-
-          {(tab === 'all' || tab === 'posts') && filteredPosts.length > 0 && (
-            <div className="result-section">
-              {tab === 'all' && <p className="result-section-label">Посты</p>}
-              {filteredPosts.map(post => (
-                <div key={post.id} className="card post result-post">
-                  <div className="post-header">
-                    <div className="post-avatar">
-                      <svg width="36" height="36" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="18" fill="#1e1e24"/>
-                        <text x="18" y="23" textAnchor="middle" fontSize="15" fill="white">{post.avatar}</text>
-                      </svg>
+          ) : (
+            <>
+              {showUsers && users.length > 0 && (
+                <div className="result-section">
+                  {tab === 'all' && <p className="result-section-label">Люди</p>}
+                  {users.map(user => (
+                    <div key={user.id} className="result-user card" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(user.id)}>
+                      <div className="post-avatar">
+                        {user.avatar_url
+                          ? <img src={user.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
+                          : <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="url(#sg)"/><defs><radialGradient id="sg" cx="30%" cy="30%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></radialGradient></defs></svg>
+                        }
+                      </div>
+                      <div className="result-user-info">
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span className="result-user-name">{user.display_name}</span>
+                          {user.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </span>
+                        <span className="result-user-meta">@{user.username}</span>
+                      </div>
                     </div>
-                    <div className="post-meta">
-                      <span className="post-username">{post.username}</span>
-                      <span className="post-time">{post.time}</span>
-                    </div>
-                  </div>
-                  <p className="post-text">{post.text}</p>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {filteredUsers.length === 0 && filteredPosts.length === 0 && (
-            <div className="search-no-results">
-              <Search size={32} strokeWidth={1.2} />
-              <p>Ничего не найдено по запросу «{query}»</p>
-            </div>
+              {showPosts && posts.length > 0 && (
+                <div className="result-section">
+                  {tab === 'all' && <p className="result-section-label">Посты</p>}
+                  {posts.map(post => (
+                    <div key={post.id} className="card post" style={{ cursor: 'pointer' }} onClick={() => onOpenPost(post)}>
+                      <div className="post-header">
+                        <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); onOpenProfile(post.user_id) }}>
+                          {post.avatar_url
+                            ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
+                            : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                          }
+                        </div>
+                        <div className="post-meta">
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span className="post-username">{post.display_name || post.username}</span>
+                            {post.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </span>
+                          <span className="post-time">{timeAgo(post.created_at)}</span>
+                        </div>
+                      </div>
+                      {post.text && <p className="post-text">{post.text}</p>}
+                      <div className="post-footer" onClick={e => e.stopPropagation()}>
+                        <div className="post-footer-left">
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                            <MessageCircle size={14} strokeWidth={1.8}/> {post.like_count}
+                          </span>
+                        </div>
+                        <div className="post-views">
+                          <Eye size={14} strokeWidth={1.8}/>
+                          <span>{post.view_count}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {users.length === 0 && posts.length === 0 && (
+                <div className="search-no-results">
+                  <Search size={32} strokeWidth={1.2}/>
+                  <p>Ничего не найдено по запросу «{query}»</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

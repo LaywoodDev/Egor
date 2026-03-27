@@ -2,18 +2,15 @@ import { useState } from 'react'
 import { supabase } from './lib/supabase'
 
 interface Props {
-  onGoSignIn: () => void
-  onSuccess: (email: string) => void
-  onOpenTerms: () => void
-  onOpenPrivacy: () => void
+  onBack: () => void
+  onDone: () => void
 }
 
-function SignUp({ onGoSignIn, onSuccess, onOpenTerms, onOpenPrivacy }: Props) {
-  const [email, setEmail] = useState('')
+function ResetPassword({ onBack, onDone }: Props) {
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [errors, setErrors] = useState({ email: false, password: false })
-  const [passwordError, setPasswordError] = useState('')
+  const [error, setError] = useState('')
   const [apiError, setApiError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -26,57 +23,35 @@ function SignUp({ onGoSignIn, onSuccess, onOpenTerms, onOpenPrivacy }: Props) {
   }
 
   const handleSubmit = async () => {
-    const emailErr = !email.trim()
-    const pwdMsg = validatePassword(password)
-    setErrors({ email: emailErr, password: !!pwdMsg })
-    setPasswordError(pwdMsg)
-    if (emailErr || pwdMsg) return
-
+    const msg = validatePassword(password)
+    if (msg) { setError(msg); return }
+    if (password !== confirm) { setError('Пароли не совпадают'); return }
     setLoading(true)
     setApiError('')
-
-    const { error } = await supabase.auth.signUp({ email: email.trim(), password })
-
+    const { error: err } = await supabase.auth.updateUser({ password })
     setLoading(false)
-
-    if (error) {
-      setApiError(error.message)
-      return
-    }
-
-    onSuccess(email.trim())
+    if (err) { setApiError(err.message); return }
+    onDone()
   }
 
   return (
     <div className="signup-page">
       <div className="signup-form">
         <div className="signup-header">
-          <h1 className="signup-title">Создание аккаунта</h1>
-          <p className="signup-subtitle">Пожалуйста, введите ваши данные</p>
+          <h1 className="signup-title">Новый пароль</h1>
+          <p className="signup-subtitle">Введите новый пароль для вашего аккаунта</p>
         </div>
 
         <div className="form-fields">
-          <div className="field-group">
-            <label className="field-label">E-Mail</label>
-            <input
-              type="email"
-              className={`field-input${errors.email ? ' field-error' : ''}`}
-              placeholder="egor@daun.com"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: false })) }}
-            />
-            {errors.email && <span className="error-text">Введите email</span>}
-          </div>
-
           <div className="field-group">
             <label className="field-label">Пароль</label>
             <div className="password-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}
-                className={`field-input password-input${errors.password ? ' field-error' : ''}`}
+                className={`field-input password-input${error ? ' field-error' : ''}`}
                 placeholder="Минимум 10 символов"
                 value={password}
-                onChange={e => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: false })); setPasswordError('') }}
+                onChange={e => { setPassword(e.target.value); setError(''); setApiError('') }}
               />
               <button type="button" className="eye-btn" onClick={() => setShowPassword(v => !v)}>
                 {showPassword ? (
@@ -93,7 +68,18 @@ function SignUp({ onGoSignIn, onSuccess, onOpenTerms, onOpenPrivacy }: Props) {
                 )}
               </button>
             </div>
-            {passwordError && <span className="error-text">{passwordError}</span>}
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">Повторите пароль</label>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              className={`field-input${error ? ' field-error' : ''}`}
+              placeholder="Повторите пароль"
+              value={confirm}
+              onChange={e => { setConfirm(e.target.value); setError(''); setApiError('') }}
+            />
+            {error && <span className="error-text">{error}</span>}
           </div>
         </div>
 
@@ -106,24 +92,22 @@ function SignUp({ onGoSignIn, onSuccess, onOpenTerms, onOpenPrivacy }: Props) {
           </div>
         )}
 
-        <p className="terms-text">
-          Продолжая, вы соглашаетесь с{' '}
-          <a href="#" className="terms-link" onClick={e => { e.preventDefault(); onOpenTerms() }}>условиями пользования</a>
-          {' '}и{' '}
-          <a href="#" className="terms-link" onClick={e => { e.preventDefault(); onOpenPrivacy() }}>политикой конфиденциальности</a>
-        </p>
-
-        <button className="submit-btn" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Загрузка...' : 'Продолжить'}
+        <button
+          className={`submit-btn${password && confirm && !loading ? '' : ' submit-btn--disabled'}`}
+          disabled={!password || !confirm || loading}
+          onClick={handleSubmit}
+        >
+          {loading ? 'Сохранение...' : 'Сохранить'}
         </button>
 
         <p className="login-text">
-          Уже есть аккаунт?{' '}
-          <a href="#" className="login-link" onClick={e => { e.preventDefault(); onGoSignIn() }}>Войти</a>
+          <a href="#" className="login-link" onClick={e => { e.preventDefault(); onBack() }}>
+            Назад
+          </a>
         </p>
       </div>
     </div>
   )
 }
 
-export default SignUp
+export default ResetPassword

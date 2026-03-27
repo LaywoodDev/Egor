@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { Trash2, Users, FileText, BarChart2, Ban, BadgeCheck, Pencil, X } from 'lucide-react'
+import { Trash2, Users, FileText, BarChart2, Ban, BadgeCheck, Pencil, X, Flag } from 'lucide-react'
 
 interface AdminPost {
   id: string
@@ -21,12 +21,24 @@ interface AdminUser {
   verified: boolean
 }
 
-type Tab = 'stats' | 'posts' | 'users'
+interface AdminReport {
+  id: string
+  post_id: string
+  reporter_id: string
+  reason: string
+  comment?: string
+  created_at: string
+  reporter_name: string
+  post_text: string
+}
+
+type Tab = 'stats' | 'posts' | 'users' | 'reports'
 
 function AdminPanel() {
   const [tab, setTab] = useState<Tab>('stats')
   const [posts, setPosts] = useState<AdminPost[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [reports, setReports] = useState<AdminReport[]>([])
   const [stats, setStats] = useState({ posts: 0, users: 0, likes: 0, comments: 0 })
   const [loading, setLoading] = useState(true)
   const [editingPost, setEditingPost] = useState<AdminPost | null>(null)
@@ -36,6 +48,7 @@ function AdminPanel() {
   useEffect(() => {
     if (tab === 'posts') loadPosts()
     else if (tab === 'users') loadUsers()
+    else if (tab === 'reports') loadReports()
   }, [tab])
 
   const loadStats = async () => {
@@ -77,6 +90,28 @@ function AdminPanel() {
     setLoading(false)
   }
 
+  const loadReports = async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('reports')
+      .select('*, posts(text)')
+      .order('created_at', { ascending: false })
+    if (data) {
+      setReports(data.map((r: any) => ({
+        id: r.id, post_id: r.post_id, reporter_id: r.reporter_id,
+        reason: r.reason, comment: r.comment, created_at: r.created_at,
+        reporter_name: 'Пользователь',
+        post_text: r.posts?.text ?? '',
+      })))
+    }
+    setLoading(false)
+  }
+
+  const deleteReport = async (id: string) => {
+    await supabase.from('reports').delete().eq('id', id)
+    setReports(prev => prev.filter(r => r.id !== id))
+  }
+
   const deletePost = async (id: string) => {
     if (!confirm('Удалить пост?')) return
     await supabase.from('posts').delete().eq('id', id)
@@ -104,15 +139,19 @@ function AdminPanel() {
 
   const deleteUser = async (id: string) => {
     if (!confirm('Удалить пользователя и все его данные?')) return
-    await supabase.from('posts').delete().eq('user_id', id)
-    await supabase.from('profiles').delete().eq('id', id)
+    const { error } = await supabase.rpc('admin_delete_user', { target_user_id: id })
+    if (error) {
+      alert('Ошибка: ' + error.message)
+      return
+    }
     setUsers(prev => prev.filter(u => u.id !== id))
   }
 
   const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
-    { id: 'stats', label: 'Статистика', icon: <BarChart2 size={15}/> },
-    { id: 'posts', label: 'Посты',      icon: <FileText size={15}/> },
-    { id: 'users', label: 'Юзеры',      icon: <Users size={15}/> },
+    { id: 'stats',   label: 'Статистика', icon: <BarChart2 size={15}/> },
+    { id: 'posts',   label: 'Посты',      icon: <FileText size={15}/> },
+    { id: 'users',   label: 'Юзеры',      icon: <Users size={15}/> },
+    { id: 'reports', label: 'Жалобы',     icon: <Flag size={15}/> },
   ]
 
   return (
@@ -203,6 +242,34 @@ function AdminPanel() {
           ))}
         </div>
 
+      ) : tab === 'reports' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {reports.length === 0 ? <div className="profile-empty"><p>Нет жалоб</p></div> : reports.map(report => (
+            <div key={report.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>{report.reason}</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                  от {report.reporter_name} · {new Date(report.created_at).toLocaleDateString('ru-RU')}
+                </div>
+                {report.post_text && (
+                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 10px', marginBottom: 4 }}>
+                    {report.post_text.slice(0, 120)}{report.post_text.length > 120 ? '…' : ''}
+                  </div>
+                )}
+                {report.comment && (
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>«{report.comment}»</div>
+                )}
+              </div>
+              <button onClick={() => deleteReport(report.id)}
+                style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <X size={14}/>
+              </button>
+            </div>
+          ))}
+        </div>
+
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {users.length === 0 ? <div className="profile-empty"><p>Нет пользователей</p></div> : users.map(user => (
@@ -210,7 +277,7 @@ function AdminPanel() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: user.banned ? 'rgba(255,255,255,0.3)' : '#fff' }}>{user.display_name}</span>
-                  {user.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" fill="#3b82f6"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  {user.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   {user.banned && <span style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 6, padding: '2px 6px' }}>забанен</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>@{user.username} · {new Date(user.created_at).toLocaleDateString('ru-RU')}</div>

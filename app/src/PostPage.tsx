@@ -16,6 +16,7 @@ interface Props {
   onOpenProfile: (userId: string) => void
   onDelete?: (id: string) => void
   onEdit?: (id: string, text: string) => void
+  onView?: (id: string) => void
 }
 
 function timeAgo(iso: string) {
@@ -70,27 +71,13 @@ function parseImageUrl(imageUrl?: string): string[] {
 }
 
 
-function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProfile, onDelete, onEdit }: Props) {
+function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProfile, onDelete, onEdit, onView }: Props) {
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
-    const incrementView = async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('view_count')
-        .eq('id', post.id)
-        .single()
-
-      if (data && !error) {
-        await supabase
-          .from('posts')
-          .update({ view_count: (data.view_count ?? 0) + 1 })
-          .eq('id', post.id)
-      }
-    }
-
-    incrementView()
+    supabase.rpc('increment_view_count', { post_id: post.id })
+    onView?.(post.id)
   }, [post.id])
 
   const imageUrls = parseImageUrl(post.image_url)
@@ -117,7 +104,10 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
             }
           </div>
           <div className="post-meta">
-            <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username}</span>
+              {post.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </span>
             <span className="post-time">{timeAgo(post.created_at)}</span>
             {post.category && (
               <span style={{ fontSize: 11, opacity: 0.8, color: ({ ask: '#a78bfa', memes: '#f59e0b', gallery: '#34d399', video: '#f87171' } as Record<string,string>)[post.category] ?? 'rgba(255,255,255,0.4)' }}>

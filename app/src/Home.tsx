@@ -48,6 +48,7 @@ interface Profile {
   avatar_url?: string
   banner_url?: string
   bio?: string
+  verified?: boolean
 }
 
 function timeAgo(iso: string) {
@@ -137,7 +138,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
         <div className="post-meta">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span className="post-username" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>{post.display_name || post.username || 'Пользователь'}</span>
-            {post.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="#3b82f6" style={{ flexShrink: 0 }}><path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            {post.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           </span>
           <span className="post-time">{timeAgo(post.created_at)}</span>
           {post.category && CATEGORY_MAP[post.category] && (
@@ -180,11 +181,15 @@ type NavItem = 'home' | 'categories' | 'search' | 'profile' | 'admin'
 
 function Home({ onLogout }: Props) {
   const [active, setActive] = useState<NavItem>('home')
+  const [homeTab, setHomeTab] = useState<'forYou' | 'subs'>('forYou')
   const [posts, setPosts] = useState<Post[]>([])
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
   const [userId, setUserId] = useState<string>('')
   const [fetchingPosts, setFetchingPosts] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   const [viewingCategory, setViewingCategory] = useState<string | null>(null)
@@ -192,6 +197,7 @@ function Home({ onLogout }: Props) {
   const [viewerIndex, setViewerIndex] = useState(0)
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
+  const feedWrapperRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -218,14 +224,22 @@ function Home({ onLogout }: Props) {
   useEffect(() => {
     if (!userId) return
     loadLikedIds()
+    loadFollowingIds()
+    loadFollowCounts()
+    const updateLastSeen = () => {
+      supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', userId)
+    }
+    updateLastSeen()
+    const interval = setInterval(updateLastSeen, 60000)
+    return () => clearInterval(interval)
   }, [userId])
 
   const loadProfile = async (uid: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('display_name, username, created_at, avatar_url, banner_url, bio')
+      .select('display_name, username, created_at, avatar_url, banner_url, bio, verified')
       .eq('id', uid)
-      .single()
+      .maybeSingle()
     if (!error && data) setProfile(data)
   }
 
@@ -281,6 +295,20 @@ function Home({ onLogout }: Props) {
     if (data) setLikedIds(new Set(data.map((l: any) => l.post_id)))
   }
 
+  const loadFollowingIds = async () => {
+    const { data } = await supabase.from('follows').select('following_id').eq('follower_id', userId)
+    if (data) setFollowingIds(new Set(data.map((f: any) => f.following_id)))
+  }
+
+  const loadFollowCounts = async () => {
+    const [{ count: followers }, { count: following }] = await Promise.all([
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', userId),
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', userId),
+    ])
+    setFollowersCount(followers ?? 0)
+    setFollowingCount(following ?? 0)
+  }
+
   const addPost = async (text: string, imageUrl?: string | string[], pollOptions?: string[], category?: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -312,7 +340,11 @@ function Home({ onLogout }: Props) {
     if (liked) {
       await supabase.from('likes').delete().eq('user_id', userId).eq('post_id', postId)
     } else {
-      await supabase.from('likes').insert({ user_id: userId, post_id: postId })
+      const { error } = await supabase.from('likes').insert(
+        { user_id: userId, post_id: postId },
+        { onConflict: 'user_id,post_id', ignoreDuplicates: true }
+      )
+      if (error) console.error('like insert error:', error)
     }
   }
 
@@ -343,6 +375,7 @@ function Home({ onLogout }: Props) {
   ]
 
   const myPosts = posts.filter(p => p.mine)
+  const subscriptionPosts = posts.filter(p => followingIds.has(p.user_id))
 
   return (
     <div className="home-layout">
@@ -354,7 +387,7 @@ function Home({ onLogout }: Props) {
               <button
                 key={item.id}
                 className={`nav-item${active === item.id ? ' nav-item--active' : ''}`}
-                onClick={() => setActive(item.id)}
+                onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null) }}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -367,7 +400,7 @@ function Home({ onLogout }: Props) {
           </button>
         </aside>
 
-        <div className="feed-wrapper">
+        <div className="feed-wrapper" ref={feedWrapperRef}>
           <main className="feed">
             {selectedPost ? (
               <PostPage
@@ -380,6 +413,7 @@ function Home({ onLogout }: Props) {
                 onOpenProfile={handleOpenProfile}
                 onDelete={id => { setPosts(prev => prev.filter(p => p.id !== id)); setSelectedPost(null) }}
                 onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                onView={id => setPosts(prev => prev.map(p => p.id === id ? { ...p, view_count: p.view_count + 1 } : p))}
               />
             ) : viewingUserId ? (
               <UserProfilePage
@@ -387,6 +421,7 @@ function Home({ onLogout }: Props) {
                 onBack={() => setViewingUserId(null)}
                 onOpenPost={post => setSelectedPost(post)}
                 onOpenProfile={handleOpenProfile}
+                onFollowChange={loadFollowingIds}
               />
             ) : viewingCategory ? (
               <CategoryPage
@@ -400,7 +435,7 @@ function Home({ onLogout }: Props) {
             ) : active === 'categories' ? (
               <Categories onSelect={id => setViewingCategory(id)}/>
             ) : active === 'search' ? (
-              <SearchPage/>
+              <SearchPage onOpenPost={post => setSelectedPost(post)} onOpenProfile={handleOpenProfile}/>
             ) : active === 'profile' ? (
               <ProfilePage
                 posts={myPosts}
@@ -412,35 +447,90 @@ function Home({ onLogout }: Props) {
                 onDeletePost={id => setPosts(prev => prev.filter(p => p.id !== id))}
                 onEditPost={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
                 profile={profile}
-                onProfileUpdate={() => userId && loadProfile(userId)}
+                followersCount={followersCount}
+                followingCount={followingCount}
+                onProfileUpdate={() => { if (userId) { loadProfile(userId); loadFollowCounts() } }}
               />
             ) : (
               <>
-                <Composer onPublish={addPost} avatarUrl={profile?.avatar_url}/>
-                {fetchingPosts ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-                    <div className="spinner"/>
+                <div className="profile-tabs-wrap home-tabs-wrap">
+                  <div className="profile-tabs">
+                    <div
+                      className="profile-tab-slider"
+                      style={{ transform: `translateX(${homeTab === 'subs' ? '100%' : '0%'})` }}
+                    />
+                    <button className={`profile-tab${homeTab === 'forYou' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('forYou')}>
+                      Для вас
+                    </button>
+                    <button className={`profile-tab${homeTab === 'subs' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('subs')}>
+                      Подписки
+                    </button>
                   </div>
-                ) : posts.map(post => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    myAvatarUrl={profile?.avatar_url}
-                    liked={likedIds.has(post.id)}
-                    onLike={() => toggleLike(post.id)}
-                    onVote={i => voteOnPoll(post.id, i)}
-                    onOpenPost={() => setSelectedPost(post)}
-                    onOpenProfile={handleOpenProfile}
-                    onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
-                    onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
-                    onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
-                  />
-                ))}
+                </div>
+
+                {homeTab === 'forYou' ? (
+                  <>
+                    <Composer onPublish={addPost} avatarUrl={profile?.avatar_url}/>
+                    {fetchingPosts ? (
+                      <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+                        <div className="spinner"/>
+                      </div>
+                    ) : posts.map(post => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        myAvatarUrl={profile?.avatar_url}
+                        liked={likedIds.has(post.id)}
+                        onLike={() => toggleLike(post.id)}
+                        onVote={i => voteOnPoll(post.id, i)}
+                        onOpenPost={() => setSelectedPost(post)}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
+                        onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
+                        onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                      />
+                    ))}
+                  </>
+                ) : (
+                  subscriptionPosts.length === 0 ? (
+                    <div className="profile-empty"><p>Нет постов из подписок</p></div>
+                  ) : (
+                    subscriptionPosts.map(post => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        myAvatarUrl={profile?.avatar_url}
+                        liked={likedIds.has(post.id)}
+                        onLike={() => toggleLike(post.id)}
+                        onVote={i => voteOnPoll(post.id, i)}
+                        onOpenPost={() => setSelectedPost(post)}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenImage={(urls, index) => { setViewerImages(urls); setViewerIndex(index) }}
+                        onDelete={id => setPosts(prev => prev.filter(p => p.id !== id))}
+                        onEdit={(id, text) => setPosts(prev => prev.map(p => p.id === id ? { ...p, text } : p))}
+                      />
+                    ))
+                  )
+                )}
               </>
             )}
           </main>
         </div>
       </div>
+
+      {/* Bottom nav — mobile only */}
+      <nav className="bottom-nav">
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            className={`bottom-nav-item${active === item.id ? ' bottom-nav-item--active' : ''}`}
+            onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null) }}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from './lib/supabase'
 
 interface Props {
   onBack: () => void
@@ -8,10 +9,22 @@ interface Props {
 function ForgotPassword({ onBack, onSuccess }: Props) {
   const [email, setEmail] = useState('')
   const [error, setError] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!email.trim()) {
       setError(true)
+      return
+    }
+    setLoading(true)
+    setApiError('')
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    })
+    setLoading(false)
+    if (err) {
+      setApiError(err.message)
       return
     }
     onSuccess(email.trim())
@@ -39,11 +52,21 @@ function ForgotPassword({ onBack, onSuccess }: Props) {
           </div>
         </div>
 
+        {apiError && (
+          <div className="alert alert--error">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            {apiError}
+          </div>
+        )}
+
         <button
-          className={`submit-btn${email.trim() ? '' : ' submit-btn--disabled'}`}
+          className={`submit-btn${email.trim() && !loading ? '' : ' submit-btn--disabled'}`}
           onClick={handleSubmit}
+          disabled={!email.trim() || loading}
         >
-          Продолжить
+          {loading ? 'Отправка...' : 'Продолжить'}
         </button>
 
         <p className="login-text">
@@ -57,3 +80,4 @@ function ForgotPassword({ onBack, onSuccess }: Props) {
 }
 
 export default ForgotPassword
+

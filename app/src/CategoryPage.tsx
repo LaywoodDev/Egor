@@ -115,7 +115,13 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
     setLikedIds(prev => { const next = new Set(prev); liked ? next.delete(postId) : next.add(postId); return next })
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, like_count: p.like_count + (liked ? -1 : 1) } : p))
     if (liked) await supabase.from('likes').delete().eq('user_id', myUserId).eq('post_id', postId)
-    else await supabase.from('likes').insert({ user_id: myUserId, post_id: postId })
+    else {
+      const { error } = await supabase.from('likes').insert(
+        { user_id: myUserId, post_id: postId },
+        { onConflict: 'user_id,post_id', ignoreDuplicates: true }
+      )
+      if (error) console.error('like insert error:', error)
+    }
   }
 
   return (

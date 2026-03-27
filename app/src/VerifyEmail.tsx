@@ -1,4 +1,5 @@
-import { useRef, useState, KeyboardEvent, ClipboardEvent } from 'react'
+import { useRef, useState } from 'react'
+import type { KeyboardEvent, ClipboardEvent } from 'react'
 import { supabase } from './lib/supabase'
 
 interface Props {
@@ -74,7 +75,7 @@ function VerifyEmail({ email, type = 'signup', onBack, onSuccess }: Props) {
     if (type === 'signup') {
       await supabase.auth.resend({ type: 'signup', email })
     } else {
-      await supabase.auth.resetPasswordForEmail(email)
+      await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
     }
   }
 

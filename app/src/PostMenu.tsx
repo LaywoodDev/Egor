@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { MoreHorizontal, Link, Pencil, Trash2, Flag, X, CheckCircle } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import type { Post } from './Home'
+import ReportModal from './ReportModal'
 
 export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (id: string) => void; onEdit?: (id: string, text: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -9,6 +10,9 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
   const [exiting, setExiting] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(post.text)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState(false)
+  const [reportExiting, setReportExiting] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -28,6 +32,15 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
     }, 2000)
     return () => clearTimeout(timer)
   }, [copied])
+
+  useEffect(() => {
+    if (!reported) return
+    const timer = setTimeout(() => {
+      setReportExiting(true)
+      setTimeout(() => { setReported(false); setReportExiting(false) }, 300)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [reported])
 
   const closeCopyNotification = () => {
     setExiting(true)
@@ -55,6 +68,7 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
 
   return (
     <>
+      {reporting && <ReportModal postId={post.id} onClose={() => setReporting(false)} onSent={() => setReported(true)}/>}
       {editing && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, backdropFilter: 'blur(4px)' }} onClick={() => setEditing(false)}>
           <div style={{ background: '#1e1e22', borderRadius: 18, padding: 24, width: '90%', maxWidth: 500, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
@@ -85,9 +99,14 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
           <div className={`toast toast--success${exiting ? ' toast--exit' : ''}`}>
             <CheckCircle size={18} strokeWidth={2}/>
             <span>Ссылка скопирована</span>
-            <button className="toast-close" onClick={closeCopyNotification}>
-              <X size={14} strokeWidth={2}/>
-            </button>
+            <button className="toast-close" onClick={closeCopyNotification}><X size={14} strokeWidth={2}/></button>
+          </div>
+        )}
+        {reported && (
+          <div className={`toast toast--success${reportExiting ? ' toast--exit' : ''}`}>
+            <CheckCircle size={18} strokeWidth={2}/>
+            <span>Жалоба отправлена</span>
+            <button className="toast-close" onClick={() => { setReportExiting(true); setTimeout(() => { setReported(false); setReportExiting(false) }, 300) }}><X size={14} strokeWidth={2}/></button>
           </div>
         )}
         <button className="post-menu-btn" onClick={e => { e.stopPropagation(); setOpen(v => !v) }}>
@@ -109,7 +128,7 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
                 </button>
               </>
             ) : (
-              <button className="post-menu-item post-menu-item--danger" onClick={() => setOpen(false)}>
+              <button className="post-menu-item post-menu-item--danger" onClick={() => { setReporting(true); setOpen(false) }}>
                 <Flag size={14}/> Пожаловаться
               </button>
             )}

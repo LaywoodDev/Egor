@@ -12,6 +12,8 @@ interface Profile {
   avatar_url?: string
   banner_url?: string
   bio?: string
+  last_seen?: string
+  verified?: boolean
 }
 
 interface Props {
@@ -19,6 +21,7 @@ interface Props {
   onBack: () => void
   onOpenPost: (post: Post) => void
   onOpenProfile: (userId: string) => void
+  onFollowChange?: () => void
 }
 
 function formatRegDate(iso: string) {
@@ -80,7 +83,7 @@ function PollDisplay({ poll, onVote }: { poll: Poll; onVote: (i: number) => void
 
 type Tab = 'posts' | 'likes'
 
-function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
+function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowChange }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
@@ -89,6 +92,9 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
   const [tab, setTab] = useState<Tab>('posts')
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -102,6 +108,8 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
     setProfile(null)
     loadProfile()
     loadPosts()
+    loadFollowCounts()
+    loadFollowState()
   }, [userId])
 
   useEffect(() => {
@@ -109,14 +117,15 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
     supabase.from('likes').select('post_id').eq('user_id', myUserId).then(({ data }) => {
       if (data) setLikedIds(new Set(data.map((l: any) => l.post_id)))
     })
+    loadFollowState()
   }, [myUserId])
 
   const loadProfile = async () => {
     const { data } = await supabase
       .from('profiles')
-      .select('display_name, username, created_at, avatar_url, banner_url, bio')
+      .select('display_name, username, created_at, avatar_url, banner_url, bio, last_seen, verified')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
     if (data) setProfile(data)
   }
 
@@ -158,6 +167,43 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
     setLoading(false)
   }
 
+  const loadFollowCounts = async () => {
+    const [{ count: followers }, { count: following }] = await Promise.all([
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', userId),
+      supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', userId),
+    ])
+    setFollowersCount(followers ?? 0)
+    setFollowingCount(following ?? 0)
+  }
+
+  const loadFollowState = async () => {
+    if (!myUserId || myUserId === userId) { setIsFollowing(false); return }
+    const { data } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', myUserId)
+      .eq('following_id', userId)
+      .maybeSingle()
+    setIsFollowing(!!data)
+  }
+
+  const toggleFollow = async () => {
+    if (!myUserId || myUserId === userId) return
+    if (isFollowing) {
+      await supabase.from('follows').delete().eq('follower_id', myUserId).eq('following_id', userId)
+      setIsFollowing(false)
+      setFollowersCount(c => Math.max(0, c - 1))
+    } else {
+      const { error } = await supabase.from('follows').insert({ follower_id: myUserId, following_id: userId })
+      if (!error) {
+        setIsFollowing(true)
+        setFollowersCount(c => c + 1)
+      }
+    }
+    loadFollowCounts()
+    onFollowChange?.()
+  }
+
   const toggleLike = async (postId: string) => {
     if (!myUserId) return
     const liked = likedIds.has(postId)
@@ -166,7 +212,11 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
     if (liked) {
       await supabase.from('likes').delete().eq('user_id', myUserId).eq('post_id', postId)
     } else {
-      await supabase.from('likes').insert({ user_id: myUserId, post_id: postId })
+      const { error } = await supabase.from('likes').insert(
+        { user_id: myUserId, post_id: postId },
+        { onConflict: 'user_id,post_id', ignoreDuplicates: true }
+      )
+      if (error) console.error('like insert error:', error)
     }
   }
 
@@ -219,18 +269,34 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile }: Props) {
               </svg>
             )}
           </div>
-          <span className="profile-online"/>
+          <span className={`profile-online${profile?.last_seen && (Date.now() - new Date(profile.last_seen).getTime()) < 5 * 60 * 1000 ? '' : ' profile-online--offline'}`}/>
         </div>
+        {myUserId && myUserId !== userId && (
+          <button
+            className={`profile-follow-btn${isFollowing ? ' profile-follow-btn--active' : ''}`}
+            onClick={toggleFollow}
+          >
+            {isFollowing ? 'Отписаться' : 'Подписаться'}
+          </button>
+        )}
       </div>
 
       <div className="profile-info">
         <div className="profile-name-row">
-          <span className="profile-name">{profile?.display_name || '—'}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="profile-name">{profile?.display_name || '—'}</span>
+            {profile?.verified && (
+              <span className="verified-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span className="verified-badge__tooltip">Верифицированный аккаунт</span>
+              </span>
+            )}
+          </span>
           <span className="profile-username">@{profile?.username || '—'}</span>
         </div>
         <div className="profile-stats">
-          <span><b>0</b> подписчиков</span>
-          <span><b>0</b> подписок</span>
+          <span><b>{followersCount}</b> подписчиков</span>
+          <span><b>{followingCount}</b> подписок</span>
         </div>
         {profile?.created_at && (
           <p className="profile-registered">Регистрация: {formatRegDate(profile.created_at)}</p>

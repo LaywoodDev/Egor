@@ -4,6 +4,7 @@ import ImageViewer from './ImageViewer'
 import type { Post } from './Home'
 import PostMenu from './PostMenu'
 
+
 function timeAgo(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (diff < 60) return 'только что'
@@ -21,6 +22,7 @@ interface Profile {
   avatar_url?: string
   banner_url?: string
   bio?: string
+  verified?: boolean
 }
 
 interface Props {
@@ -33,6 +35,8 @@ interface Props {
   onDeletePost?: (id: string) => void
   onEditPost?: (id: string, text: string) => void
   profile: Profile | null
+  followersCount: number
+  followingCount: number
   onProfileUpdate: () => void
 }
 
@@ -60,7 +64,7 @@ function parseImageUrl(imageUrl?: string): string[] {
   return [imageUrl]
 }
 
-function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, onProfileUpdate }: Props) {
+function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, followersCount, followingCount, onProfileUpdate }: Props) {
   const [tab, setTab] = useState<Tab>('posts')
   const [showSettings, setShowSettings] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
@@ -79,7 +83,7 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
         />
       </div>
 
-      {/* Avatar + Edit — outside card */}
+      {/* Avatar + Edit – outside card */}
       <div className="profile-avatar-row">
         <div className="profile-avatar-wrap">
           <div className="profile-avatar">
@@ -102,15 +106,23 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
         <button className="profile-edit-btn" onClick={() => setShowSettings(true)}>Редактировать</button>
       </div>
 
-      {/* Info — outside card */}
+      {/* Info – outside card */}
       <div className="profile-info">
         <div className="profile-name-row">
-          <span className="profile-name">{profile?.display_name || '—'}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="profile-name">{profile?.display_name || '—'}</span>
+            {profile?.verified && (
+              <span className="verified-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, display: 'block' }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span className="verified-badge__tooltip">Верифицированный аккаунт</span>
+              </span>
+            )}
+          </span>
           <span className="profile-username">@{profile?.username || '—'}</span>
         </div>
         <div className="profile-stats">
-          <span><b>0</b> подписчиков</span>
-          <span><b>0</b> подписок</span>
+          <span><b>{followersCount}</b> подписчиков</span>
+          <span><b>{followingCount}</b> подписок</span>
         </div>
         {profile?.created_at && (
           <p className="profile-registered">Регистрация: {formatRegDate(profile.created_at)}</p>
@@ -153,7 +165,10 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
                     }
                   </div>
                   <div className="post-meta">
-                    <span className="post-username">{post.display_name || post.username}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className="post-username">{post.display_name || post.username}</span>
+                      {post.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </span>
                     <span className="post-time">{timeAgo(post.created_at)}</span>
                   </div>
                   <PostMenu post={post} onDelete={onDeletePost} onEdit={onEditPost}/>
@@ -168,7 +183,6 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
                 )}
                 {post.poll && (
                   <div onClick={e => e.stopPropagation()}>
-
                     <div className="post-poll">
                       {post.poll.options.map((opt, i) => {
                         const total = post.poll!.vote_counts.reduce((a, b) => a + b, 0)
