@@ -198,20 +198,20 @@ function AdminPanel() {
       {/* Edit post modal */}
       {editingPost && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, backdropFilter: 'blur(4px)' }} onClick={() => setEditingPost(null)}>
-          <div style={{ background: '#1e1e22', borderRadius: 18, padding: 24, width: '90%', maxWidth: 500, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 18, padding: 24, width: '90%', maxWidth: 500, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: 0 }}>Редактировать пост</h3>
-              <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}><X size={18}/></button>
+              <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Редактировать пост</h3>
+              <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', color: 'rgba(var(--t),0.4)', cursor: 'pointer' }}><X size={18}/></button>
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>{editingPost.display_name}</div>
+            <div style={{ fontSize: 12, color: 'rgba(var(--t),0.35)', marginBottom: 10 }}>{editingPost.display_name}</div>
             <textarea
               value={editText}
               onChange={e => setEditText(e.target.value)}
-              style={{ width: '100%', padding: 12, background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontFamily: 'inherit', fontSize: 14, minHeight: 120, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: 12, background: 'var(--bg-subtle)', border: '1px solid rgba(var(--t),0.1)', borderRadius: 12, color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, minHeight: 120, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
             />
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditingPost(null)} style={{ padding: '9px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>Отмена</button>
-              <button onClick={saveEditPost} style={{ padding: '9px 18px', borderRadius: 16, border: 'none', background: '#fff', color: '#151518', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>Сохранить</button>
+              <button onClick={() => setEditingPost(null)} style={{ padding: '9px 18px', borderRadius: 16, border: '1px solid rgba(var(--t),0.15)', background: 'transparent', color: 'rgba(var(--t),0.6)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>Отмена</button>
+              <button onClick={saveEditPost} style={{ padding: '9px 18px', borderRadius: 16, border: 'none', background: 'var(--text)', color: 'var(--btn-text)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600 }}>Сохранить</button>
             </div>
           </div>
         </div>
@@ -227,8 +227,8 @@ function AdminPanel() {
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '7px 15px', borderRadius: 18, border: 'none', cursor: 'pointer',
             fontFamily: 'inherit', fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
-            background: tab === t.id ? '#ffffff' : 'rgba(255,255,255,0.07)',
-            color: tab === t.id ? '#151518' : 'rgba(255,255,255,0.6)',
+            background: tab === t.id ? 'var(--btn-bg)' : 'rgba(var(--t),0.07)',
+            color: tab === t.id ? 'var(--btn-text)' : 'rgba(var(--t),0.6)',
           }}>
             {t.icon} {t.label}
           </button>
@@ -248,8 +248,8 @@ function AdminPanel() {
             { label: 'Комментариев',  value: stats.comments },
           ].map(s => (
             <div key={s.label} className="card" style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: 32, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>{s.label}</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 13, color: 'rgba(var(--t),0.4)', marginTop: 6 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -259,16 +259,16 @@ function AdminPanel() {
           {posts.length === 0 ? <div className="profile-empty"><p>Нет постов</p></div> : posts.map(post => (
             <div key={post.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: 'rgba(var(--t),0.4)', marginBottom: 4 }}>
                   {post.display_name} · {new Date(post.created_at).toLocaleDateString('ru-RU')} · ❤ {post.like_count} · 👁 {post.view_count}
                 </div>
-                <div style={{ fontSize: 14, color: '#fff', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {post.text || <em style={{ color: 'rgba(255,255,255,0.3)' }}>Без текста</em>}
+                <div style={{ fontSize: 14, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {post.text || <em style={{ color: 'rgba(var(--t),0.3)' }}>Без текста</em>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 <button onClick={() => { setEditingPost(post); setEditText(post.text) }}
-                  style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center' }}>
+                  style={{ background: 'rgba(var(--t),0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(var(--t),0.7)', display: 'flex', alignItems: 'center' }}>
                   <Pencil size={14}/>
                 </button>
                 <button onClick={() => deletePost(post.id)}
@@ -288,20 +288,20 @@ function AdminPanel() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>{report.reason}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: 'rgba(var(--t),0.4)', marginBottom: 4 }}>
                   от {report.reporter_name} · {new Date(report.created_at).toLocaleDateString('ru-RU')}
                 </div>
                 {report.post_text && (
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 10px', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, color: 'rgba(var(--t),0.6)', background: 'rgba(var(--t),0.04)', borderRadius: 8, padding: '6px 10px', marginBottom: 4 }}>
                     {report.post_text.slice(0, 120)}{report.post_text.length > 120 ? '…' : ''}
                   </div>
                 )}
                 {report.comment && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>«{report.comment}»</div>
+                  <div style={{ fontSize: 12, color: 'rgba(var(--t),0.4)', fontStyle: 'italic' }}>«{report.comment}»</div>
                 )}
               </div>
               <button onClick={() => deleteReport(report.id)}
-                style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                style={{ background: 'rgba(var(--t),0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(var(--t),0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 <X size={14}/>
               </button>
             </div>
@@ -311,40 +311,40 @@ function AdminPanel() {
       ) : tab === 'notify' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="card" style={{ padding: 18 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 14 }}>Новое уведомление</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Новое уведомление</div>
             <input
               placeholder="Заголовок"
               value={notifyTitle}
               onChange={e => setNotifyTitle(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+              style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-subtle)', border: '1px solid rgba(var(--t),0.1)', borderRadius: 12, color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
             />
             <textarea
               placeholder="Текст сообщения"
               value={notifyBody}
               onChange={e => setNotifyBody(e.target.value)}
               rows={4}
-              style={{ width: '100%', padding: '10px 14px', background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 14 }}
+              style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-subtle)', border: '1px solid rgba(var(--t),0.1)', borderRadius: 12, color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 14 }}
             />
             <button
               onClick={sendNotification}
               disabled={notifySending || !notifyTitle.trim() || !notifyBody.trim()}
-              style={{ width: '100%', padding: '11px', borderRadius: 14, border: 'none', background: notifyTitle.trim() && notifyBody.trim() ? '#fff' : 'rgba(255,255,255,0.15)', color: notifyTitle.trim() && notifyBody.trim() ? '#151518' : 'rgba(255,255,255,0.4)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: notifyTitle.trim() && notifyBody.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
+              style={{ width: '100%', padding: '11px', borderRadius: 14, border: 'none', background: notifyTitle.trim() && notifyBody.trim() ? 'var(--btn-bg)' : 'rgba(var(--t),0.15)', color: notifyTitle.trim() && notifyBody.trim() ? 'var(--btn-text)' : 'rgba(var(--t),0.4)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: notifyTitle.trim() && notifyBody.trim() ? 'pointer' : 'default', transition: 'all 0.15s' }}
             >
               {notifySending ? 'Отправка…' : 'Разослать всем'}
             </button>
           </div>
           {notifications.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', paddingLeft: 4 }}>История рассылок</div>
+              <div style={{ fontSize: 13, color: 'rgba(var(--t),0.35)', paddingLeft: 4 }}>История рассылок</div>
               {notifications.map(n => (
                 <div key={n.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 3 }}>{n.title}</div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 4, whiteSpace: 'pre-wrap' }}>{n.body}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{n.title}</div>
+                    <div style={{ fontSize: 13, color: 'rgba(var(--t),0.55)', marginBottom: 4, whiteSpace: 'pre-wrap' }}>{n.body}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(var(--t),0.3)' }}>{new Date(n.created_at).toLocaleString('ru-RU')}</div>
                   </div>
                   <button onClick={() => deleteNotification(n.id)}
-                    style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    style={{ background: 'rgba(var(--t),0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'rgba(var(--t),0.5)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                     <X size={14}/>
                   </button>
                 </div>
@@ -359,21 +359,21 @@ function AdminPanel() {
             <div key={user.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: user.banned ? 'rgba(255,255,255,0.3)' : '#fff' }}>{user.display_name}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: user.banned ? 'rgba(var(--t),0.3)' : 'var(--text)' }}>{user.display_name}</span>
                   {user.verified && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   {user.banned && <span style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 6, padding: '2px 6px' }}>забанен</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>@{user.username} · {new Date(user.created_at).toLocaleDateString('ru-RU')}</div>
+                <div style={{ fontSize: 12, color: 'rgba(var(--t),0.35)' }}>@{user.username} · {new Date(user.created_at).toLocaleDateString('ru-RU')}</div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {/* Verify */}
                 <button onClick={() => toggleVerify(user)} title={user.verified ? 'Убрать верификацию' : 'Верифицировать'}
-                  style={{ background: user.verified ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: user.verified ? '#3b82f6' : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                  style={{ background: user.verified ? 'rgba(59,130,246,0.2)' : 'rgba(var(--t),0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: user.verified ? '#3b82f6' : 'rgba(var(--t),0.5)', display: 'flex', alignItems: 'center' }}>
                   <BadgeCheck size={15}/>
                 </button>
                 {/* Ban */}
                 <button onClick={() => toggleBan(user)} title={user.banned ? 'Разбанить' : 'Забанить'}
-                  style={{ background: user.banned ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: user.banned ? '#ef4444' : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                  style={{ background: user.banned ? 'rgba(239,68,68,0.2)' : 'rgba(var(--t),0.07)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: user.banned ? '#ef4444' : 'rgba(var(--t),0.5)', display: 'flex', alignItems: 'center' }}>
                   <Ban size={15}/>
                 </button>
                 {/* Delete */}

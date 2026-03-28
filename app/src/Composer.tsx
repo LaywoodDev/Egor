@@ -158,7 +158,7 @@ function Composer({ avatarUrl, onPublish }: Props) {
             rows={1}
           />
           {text.length > 0 && (
-            <div style={{ textAlign: 'right', fontSize: 12, marginTop: 4, color: text.length > TEXT_LIMIT ? '#ef4444' : text.length > TEXT_LIMIT * 0.8 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)' }}>
+            <div style={{ textAlign: 'right', fontSize: 12, marginTop: 4, color: text.length > TEXT_LIMIT ? '#ef4444' : text.length > TEXT_LIMIT * 0.8 ? 'rgba(var(--t),0.4)' : 'rgba(var(--t),0.2)' }}>
               {text.length}/{TEXT_LIMIT}
             </div>
           )}
@@ -236,12 +236,12 @@ function Composer({ avatarUrl, onPublish }: Props) {
               <LayoutGrid size={18} strokeWidth={1.8}/>
             </button>
             {catOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: '#2a2a32', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 6, zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 180 }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: 'var(--bg-input)', border: '1px solid rgba(var(--t),0.1)', borderRadius: 12, padding: 6, zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 180 }}>
                 {category && (
                   <button
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.45)', fontSize: 13, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, transition: 'background 0.12s' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--t),0.45)', fontSize: 13, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, transition: 'background 0.12s' }}
                     onClick={() => { setCategory(undefined); setCatOpen(false) }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--t),0.06)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   >
                     <X size={14}/> Убрать категорию
@@ -252,10 +252,10 @@ function Composer({ avatarUrl, onPublish }: Props) {
                   return (
                     <button
                       key={cat.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: category === cat.id ? 'rgba(255,255,255,0.07)' : 'none', border: 'none', cursor: 'pointer', color: category === cat.id ? cat.color : 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, transition: 'background 0.12s', whiteSpace: 'nowrap' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: category === cat.id ? 'rgba(var(--t),0.07)' : 'none', border: 'none', cursor: 'pointer', color: category === cat.id ? cat.color : 'rgba(var(--t),0.85)', fontSize: 13, fontFamily: 'inherit', padding: '8px 10px', borderRadius: 8, transition: 'background 0.12s', whiteSpace: 'nowrap' }}
                       onClick={() => { setCategory(cat.id); setCatOpen(false) }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-                      onMouseLeave={e => e.currentTarget.style.background = category === cat.id ? 'rgba(255,255,255,0.07)' : 'none'}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--t),0.07)'}
+                      onMouseLeave={e => e.currentTarget.style.background = category === cat.id ? 'rgba(var(--t),0.07)' : 'none'}
                     >
                       <Icon size={14} color={cat.color}/> {cat.name}
                     </button>
@@ -271,7 +271,7 @@ function Composer({ avatarUrl, onPublish }: Props) {
             const cat = CATEGORIES.find(c => c.id === category)!
             const Icon = cat.icon
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 18, background: 'rgba(255,255,255,0.07)', fontSize: 12, color: cat.color, fontWeight: 500 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 18, background: 'rgba(var(--t),0.07)', fontSize: 12, color: cat.color, fontWeight: 500 }}>
                 <Icon size={12} color={cat.color}/> {cat.name}
               </div>
             )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Heart, MessageCircle, AtSign } from 'lucide-react'
+import { Heart, MessageCircle, AtSign, Bell } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 interface UserNotification {
@@ -29,9 +29,17 @@ function formatDate(iso: string) {
 }
 
 const TYPE_ICON: Record<string, { icon: JSX.Element; color: string }> = {
-  like:    { icon: <Heart size={10} fill="#fff" stroke="none"/>, color: '#e53e3e' },
-  comment: { icon: <MessageCircle size={10} fill="#fff" stroke="none"/>, color: '#3b82f6' },
-  mention: { icon: <AtSign size={10} strokeWidth={2.5}/>, color: '#a78bfa' },
+  like:      { icon: <Heart size={10} fill="#fff" stroke="none"/>, color: '#e53e3e' },
+  comment:   { icon: <MessageCircle size={10} fill="#fff" stroke="none"/>, color: '#3b82f6' },
+  mention:   { icon: <AtSign size={10} strokeWidth={2.5}/>, color: '#a78bfa' },
+  broadcast: { icon: <Bell size={10} fill="#fff" stroke="none"/>, color: '#f59e0b' },
+}
+
+interface Broadcast {
+  id: string
+  title: string
+  body: string
+  created_at: string
 }
 
 const TYPE_TEXT: Record<string, string> = {
@@ -42,6 +50,7 @@ const TYPE_TEXT: Record<string, string> = {
 
 function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
   const [items, setItems] = useState<UserNotification[]>([])
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -49,16 +58,23 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const { data } = await supabase
-        .from('user_notifications')
-        .select(`
-          id, type, post_id, comment_text, read, created_at,
-          profiles!user_notifications_actor_id_fkey(id, display_name, avatar_url, verified),
-          posts(text)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
+      const [{ data }, { data: bdata }] = await Promise.all([
+        supabase
+          .from('user_notifications')
+          .select(`
+            id, type, post_id, comment_text, read, created_at,
+            profiles!user_notifications_actor_id_fkey(id, display_name, avatar_url, verified),
+            posts(text)
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('notifications')
+          .select('id, title, body, created_at')
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
 
       if (data) {
         setItems(data.map((n: any) => ({
@@ -82,6 +98,7 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
           .eq('user_id', user.id)
           .eq('read', false)
       }
+      if (bdata) setBroadcasts(bdata)
       setLoading(false)
     }
     load()
@@ -98,10 +115,22 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
           <div className="spinner"/>
         </div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && broadcasts.length === 0 ? (
         <div className="profile-empty"><p>Нет уведомлений</p></div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {broadcasts.map(b => (
+            <div key={'b-' + b.id} className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Bell size={18} color="#f59e0b" strokeWidth={1.8}/>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{b.title}</div>
+                <div style={{ fontSize: 13, color: 'rgba(var(--t),0.6)', whiteSpace: 'pre-wrap' }}>{b.body}</div>
+                <div style={{ fontSize: 12, color: 'rgba(var(--t),0.25)', marginTop: 5 }}>{formatDate(b.created_at)}</div>
+              </div>
+            </div>
+          ))}
           {items.map(n => {
             const typeInfo = TYPE_ICON[n.type]
             const preview = n.type === 'comment' ? n.comment_text : n.post_text
@@ -117,12 +146,12 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
                   {n.actor_avatar ? (
                     <img src={n.actor_avatar} alt="" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover' }}/>
                   ) : (
-                    <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#fff', fontWeight: 600 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>
                       {n.actor_name.charAt(0).toUpperCase()}
                     </div>
                   )}
                   {typeInfo && (
-                    <div style={{ position: 'absolute', bottom: 0, right: -2, width: 18, height: 18, borderRadius: '50%', background: typeInfo.color, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #1e1e22' }}>
+                    <div style={{ position: 'absolute', bottom: 0, right: -2, width: 18, height: 18, borderRadius: '50%', background: typeInfo.color, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-card)' }}>
                       {typeInfo.icon}
                     </div>
                   )}
@@ -132,8 +161,8 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, lineHeight: 1.4 }}>
                     <span
-                      style={{ fontWeight: 700, color: '#fff', cursor: 'pointer' }}
-                      onClick={e => { e.stopPropagation(); /* TODO: onOpenProfile */ }}
+                      style={{ fontWeight: 700, color: 'var(--text)', cursor: 'pointer' }}
+                      onClick={e => { e.stopPropagation(); n.actor_id && onOpenProfile?.(n.actor_id) }}
                     >
                       {n.actor_name}
                     </span>
@@ -144,14 +173,14 @@ function NotificationsPage({ onOpenProfile, onOpenPost }: Props) {
                       </svg>
                     )}
                     {' '}
-                    <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 400 }}>{TYPE_TEXT[n.type]}</span>
+                    <span style={{ color: 'rgba(var(--t),0.45)', fontWeight: 400 }}>{TYPE_TEXT[n.type]}</span>
                   </div>
                   {preview && (
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 13, color: 'rgba(var(--t),0.5)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {preview}
                     </div>
                   )}
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>{formatDate(n.created_at)}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(var(--t),0.25)', marginTop: 5 }}>{formatDate(n.created_at)}</div>
                 </div>
               </div>
             )

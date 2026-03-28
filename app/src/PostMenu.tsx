@@ -105,12 +105,12 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
       {reporting && <ReportModal postId={post.id} onClose={() => setReporting(false)} onSent={() => setReported(true)}/>}
       {editing && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, backdropFilter: 'blur(4px)' }} onClick={() => setEditing(false)}>
-          <div style={{ background: '#1e1e22', borderRadius: 18, padding: 24, width: '90%', maxWidth: 500, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#ffffff', marginBottom: 16 }}>Редактировать пост</h3>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 18, padding: 24, width: '90%', maxWidth: 500, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Редактировать пост</h3>
             <textarea
               value={editText}
               onChange={e => setEditText(e.target.value)}
-              style={{ width: '100%', padding: 12, background: '#28282e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#ffffff', fontFamily: 'inherit', fontSize: 14, minHeight: 120, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: 12, background: 'var(--bg-subtle)', border: '1px solid rgba(var(--t),0.1)', borderRadius: 12, color: 'var(--text)', fontFamily: 'inherit', fontSize: 14, minHeight: 120, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               placeholder="Текст поста"
             />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -129,18 +129,18 @@ export function PostMenu({ post, onDelete, onEdit }: { post: Post; onDelete?: (i
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                style={{ width: 80, height: 80, borderRadius: 8, border: '1.5px dashed rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 28, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 80, height: 80, borderRadius: 8, border: '1.5px dashed rgba(var(--t),0.2)', background: 'rgba(var(--t),0.04)', color: 'rgba(var(--t),0.4)', cursor: 'pointer', fontSize: 28, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 {uploading ? '…' : '+'}
               </button>
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditing(false)} style={{ padding: '10px 20px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#ffffff' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}>
+              <button onClick={() => setEditing(false)} style={{ padding: '10px 20px', borderRadius: 18, border: '1px solid rgba(var(--t),0.15)', background: 'transparent', color: 'rgba(var(--t),0.7)', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--t),0.07)'; e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(var(--t),0.7)' }}>
                 Отмена
               </button>
-              <button onClick={saveEdit} style={{ padding: '10px 20px', borderRadius: 18, border: 'none', background: '#ffffff', color: '#151518', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}
+              <button onClick={saveEdit} style={{ padding: '10px 20px', borderRadius: 18, border: 'none', background: 'var(--text)', color: 'var(--btn-text)', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                 Сохранить

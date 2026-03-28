@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Eye, MessageCircle, ShieldCheck } from 'lucide-react'
 import ImageViewer from './ImageViewer'
 import type { Post } from './Home'
@@ -29,8 +29,23 @@ interface Profile {
   verified?: boolean
 }
 
+const PROFILE_PAGE_SIZE = 15
+
+function parsePost(p: any, myId?: string): Post {
+  return {
+    id: p.id, user_id: p.user_id, text: p.text,
+    image_url: p.image_url, created_at: p.created_at,
+    like_count: p.likes?.length ?? p.like_count ?? 0,
+    view_count: p.view_count ?? 0,
+    mine: p.user_id === myId,
+    display_name: p.profiles?.display_name ?? 'Пользователь',
+    username: p.profiles?.username ?? '',
+    avatar_url: p.profiles?.avatar_url,
+    verified: p.profiles?.verified ?? false,
+  }
+}
+
 interface Props {
-  posts: Post[]
   likedIds: Set<string>
   onAddPost: (text: string, imageUrl?: string, poll?: string[]) => Promise<void>
   onLike: (id: string) => void
@@ -71,7 +86,7 @@ function parseImageUrl(imageUrl?: string): string[] {
   return [imageUrl]
 }
 
-function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, followersCount, followingCount, onProfileUpdate, myUserId, onOpenProfile, onOpenAdmin }: Props) {
+function ProfilePage({ likedIds, onAddPost, onLike, onVote, onOpenPost, onDeletePost, onEditPost, profile, followersCount, followingCount, onProfileUpdate, myUserId, onOpenProfile, onOpenAdmin }: Props) {
   const [tab, setTab] = useState<Tab>('posts')
   const [showSettings, setShowSettings] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
@@ -80,8 +95,67 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
   const [likedPosts, setLikedPosts] = useState<Post[]>([])
   const [likedLoading, setLikedLoading] = useState(false)
 
+  const [profilePosts, setProfilePosts] = useState<Post[]>([])
+  const [loadingPosts, setLoadingPosts] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const offsetRef = useRef(0)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const loadInitialPosts = useCallback(async () => {
+    if (!myUserId) return
+    setLoadingPosts(true)
+    offsetRef.current = 0
+    const { data } = await supabase
+      .from('posts')
+      .select('*, profiles!posts_user_id_fkey(display_name, username, avatar_url, verified), likes(id)')
+      .eq('user_id', myUserId)
+      .order('created_at', { ascending: false })
+      .range(0, PROFILE_PAGE_SIZE - 1)
+    if (data) {
+      setProfilePosts(data.map((p: any) => parsePost(p, myUserId)))
+      offsetRef.current = data.length
+      setHasMore(data.length === PROFILE_PAGE_SIZE)
+    }
+    setLoadingPosts(false)
+  }, [myUserId])
+
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMore || !hasMore || !myUserId) return
+    setLoadingMore(true)
+    const from = offsetRef.current
+    const { data } = await supabase
+      .from('posts')
+      .select('*, profiles!posts_user_id_fkey(display_name, username, avatar_url, verified), likes(id)')
+      .eq('user_id', myUserId)
+      .order('created_at', { ascending: false })
+      .range(from, from + PROFILE_PAGE_SIZE - 1)
+    if (data) {
+      setProfilePosts(prev => {
+        const ids = new Set(prev.map(p => p.id))
+        return [...prev, ...data.map((p: any) => parsePost(p, myUserId)).filter((p: Post) => !ids.has(p.id))]
+      })
+      offsetRef.current = from + data.length
+      setHasMore(data.length === PROFILE_PAGE_SIZE)
+    }
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, myUserId])
+
+  useEffect(() => { loadInitialPosts() }, [loadInitialPosts])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || loadingPosts) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadMorePosts()
+    }, { threshold: 0.1 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loadingPosts, loadMorePosts])
+
   useEffect(() => {
     if (tab !== 'likes' || !myUserId) return
+    if (likedPosts.length > 0) return
     setLikedLoading(true)
     const fetchLiked = async () => {
       const { data: likes } = await supabase
@@ -150,7 +224,7 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 52 }}>
           {onOpenAdmin && (
-            <button onClick={onOpenAdmin} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 12px', borderRadius: 18, border: 'none', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: -8 }}>
+            <button onClick={onOpenAdmin} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 12px', borderRadius: 18, border: 'none', boxShadow: 'inset 0 0 0 1px rgba(var(--t),0.15)', background: 'transparent', color: 'rgba(var(--t),0.6)', cursor: 'pointer', alignSelf: 'flex-end', marginBottom: -8 }}>
               <ShieldCheck size={17}/>
             </button>
           )}
@@ -201,14 +275,21 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
       </div>
 
       {tab === 'posts' && (
-        <>
-          <Composer onPublish={onAddPost} avatarUrl={profile?.avatar_url}/>
+        <div key="posts" className="tab-content-fade">
+          <Composer
+            onPublish={async (text, imageUrl, poll) => {
+              await onAddPost(text, imageUrl, poll)
+              await loadInitialPosts()
+            }}
+            avatarUrl={profile?.avatar_url}
+          />
 
-          {/* User's posts */}
-          {posts.length === 0 ? (
+          {loadingPosts ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><div className="spinner"/></div>
+          ) : profilePosts.length === 0 ? (
             <div className="profile-empty"><p>Нет постов</p></div>
           ) : (
-            posts.map(post => {
+            profilePosts.map(post => {
               const imageUrls = parseImageUrl(post.image_url)
               return (
               <div key={post.id} className="card post" style={{ cursor: 'pointer' }} onClick={() => onOpenPost(post)}>
@@ -226,7 +307,11 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
                     </span>
                     <span className="post-time">{timeAgo(post.created_at)}</span>
                   </div>
-                  <PostMenu post={post} onDelete={onDeletePost} onEdit={onEditPost}/>
+                  <PostMenu
+                    post={post}
+                    onDelete={id => { setProfilePosts(prev => prev.filter(p => p.id !== id)); onDeletePost?.(id) }}
+                    onEdit={(id, text, image_url) => { setProfilePosts(prev => prev.map(p => p.id === id ? { ...p, text, image_url } : p)); onEditPost?.(id, text, image_url) }}
+                  />
                 </div>
                 {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile ?? (() => {})))}</p>}
                 {imageUrls.length > 0 && (
@@ -278,59 +363,67 @@ function ProfilePage({ posts, likedIds, onAddPost, onLike, onVote, onOpenPost, o
             )
             })
           )}
-        </>
+
+          {!loadingPosts && (
+            <div ref={sentinelRef} style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+              {loadingMore && <div className="spinner"/>}
+            </div>
+          )}
+        </div>
       )}
 
       {tab === 'likes' && (
-        likedLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><div className="spinner"/></div>
-        ) : likedPosts.length === 0 ? (
-          <div className="profile-empty"><p>Нет лайкнутых постов</p></div>
-        ) : likedPosts.map(post => {
-          const imageUrls = parseImageUrl(post.image_url)
-          return (
-            <div key={post.id} className="card post" style={{ cursor: 'pointer' }} onClick={() => onOpenPost(post)}>
-              <div className="post-header" onClick={e => e.stopPropagation()}>
-                <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile?.(post.user_id)}>
-                  {post.avatar_url
-                    ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                    : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
-                  }
+        <div className="tab-content-fade">
+          {likedLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><div className="spinner"/></div>
+          ) : likedPosts.length === 0 ? (
+            <div className="profile-empty"><p>Нет лайкнутых постов</p></div>
+          ) : likedPosts.map(post => {
+            const imageUrls = parseImageUrl(post.image_url)
+            return (
+              <div key={post.id} className="card post" style={{ cursor: 'pointer' }} onClick={() => onOpenPost(post)}>
+                <div className="post-header" onClick={e => e.stopPropagation()}>
+                  <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile?.(post.user_id)}>
+                    {post.avatar_url
+                      ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
+                      : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="var(--bg-input)"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(var(--t),0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                    }
+                  </div>
+                  <div className="post-meta">
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className={`post-username${post.verified ? ' verified-name' : ''}`} style={{ cursor: 'pointer' }} onClick={() => onOpenProfile?.(post.user_id)}>{post.display_name || post.username}</span>
+                      {post.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </span>
+                    <span className="post-time">{timeAgo(post.created_at)}</span>
+                  </div>
                 </div>
-                <div className="post-meta">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span className={`post-username${post.verified ? ' verified-name' : ''}`} style={{ cursor: 'pointer' }} onClick={() => onOpenProfile?.(post.user_id)}>{post.display_name || post.username}</span>
-                    {post.verified && <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/><path d="M8 12l3 3 5-6" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                  </span>
-                  <span className="post-time">{timeAgo(post.created_at)}</span>
+                {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile ?? (() => {})))}</p>}
+                {imageUrls.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                    {imageUrls.map((url, i) => (
+                      <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer', display: 'block' }} onClick={() => { setViewerImages(imageUrls); setViewerIndex(i) }}/>
+                    ))}
+                  </div>
+                )}
+                <div className="post-footer" onClick={e => e.stopPropagation()}>
+                  <div className="post-footer-left">
+                    <button className="like-btn" onClick={() => onLike(post.id)}>
+                      <IcHeart filled={likedIds.has(post.id)}/>
+                      <span>{post.like_count}</span>
+                    </button>
+                    <button className="comment-btn" onClick={() => onOpenPost(post)}>
+                      <MessageCircle size={18} strokeWidth={1.8}/>
+                    </button>
+                  </div>
+                  <div className="post-views">
+                    <Eye size={14} strokeWidth={1.8}/>
+                    <span>{post.view_count}</span>
+                  </div>
                 </div>
               </div>
-              {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile ?? (() => {})))}</p>}
-              {imageUrls.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: imageUrls.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 6, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-                  {imageUrls.map((url, i) => (
-                    <img key={i} src={url} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer', display: 'block' }} onClick={() => { setViewerImages(imageUrls); setViewerIndex(i) }}/>
-                  ))}
-                </div>
-              )}
-              <div className="post-footer" onClick={e => e.stopPropagation()}>
-                <div className="post-footer-left">
-                  <button className="like-btn" onClick={() => onLike(post.id)}>
-                    <IcHeart filled={likedIds.has(post.id)}/>
-                    <span>{post.like_count}</span>
-                  </button>
-                  <button className="comment-btn" onClick={() => onOpenPost(post)}>
-                    <MessageCircle size={18} strokeWidth={1.8}/>
-                  </button>
-                </div>
-                <div className="post-views">
-                  <Eye size={14} strokeWidth={1.8}/>
-                  <span>{post.view_count}</span>
-                </div>
-              </div>
-            </div>
-          )
-        })
+            )
+          })}
+        </div>
       )}
 
       {showSettings && (

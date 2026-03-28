@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import type { Post } from './Home'
 import { linkify } from './linkify'
 import { openMention } from './mentionHelper'
+import { CATEGORIES } from './Categories'
 
 interface Profile {
   id: string
@@ -16,6 +17,7 @@ interface Profile {
 interface Props {
   onOpenPost: (post: Post) => void
   onOpenProfile: (userId: string) => void
+  onSelectCategory: (categoryId: string) => void
 }
 
 type Tab = 'all' | 'posts' | 'users'
@@ -28,7 +30,7 @@ function timeAgo(iso: string) {
   return `${Math.floor(diff / 86400)}д.`
 }
 
-function SearchPage({ onOpenPost, onOpenProfile }: Props) {
+function SearchPage({ onOpenPost, onOpenProfile, onSelectCategory }: Props) {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<Tab>('all')
   const [posts, setPosts] = useState<Post[]>([])
@@ -101,9 +103,23 @@ function SearchPage({ onOpenPost, onOpenProfile }: Props) {
       </div>
 
       {!q ? (
-        <div className="search-empty">
-          <Search size={36} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.15)', margin: '40px auto 12px', display: 'block' }}/>
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Введите запрос для поиска</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(var(--t),0.35)', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0 2px' }}>Категории</p>
+          <div className="cat-grid">
+            {CATEGORIES.map(cat => {
+              const Icon = cat.icon
+              return (
+                <button key={cat.id} className="cat-card" onClick={() => onSelectCategory(cat.id)}>
+                  <div className="cat-icon" style={{ background: cat.bg }}>
+                    <Icon size={22} color={cat.color} strokeWidth={1.8}/>
+                  </div>
+                  <div className="cat-info">
+                    <span className="cat-name">{cat.name}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
       ) : (
         <div className="search-results">
@@ -154,7 +170,7 @@ function SearchPage({ onOpenPost, onOpenProfile }: Props) {
                         <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={e => { e.stopPropagation(); onOpenProfile(post.user_id) }}>
                           {post.avatar_url
                             ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                            : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                            : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="var(--bg-input)"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(var(--t),0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
                           }
                         </div>
                         <div className="post-meta">
@@ -168,7 +184,7 @@ function SearchPage({ onOpenPost, onOpenProfile }: Props) {
                       {post.text && <p className="post-text">{linkify(post.text, u => openMention(u, onOpenProfile))}</p>}
                       <div className="post-footer" onClick={e => e.stopPropagation()}>
                         <div className="post-footer-left">
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(var(--t),0.4)', fontSize: 13 }}>
                             <MessageCircle size={14} strokeWidth={1.8}/> {post.like_count}
                           </span>
                         </div>

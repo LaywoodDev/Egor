@@ -10,12 +10,13 @@ const REASONS = [
 ]
 
 interface Props {
-  postId: string
+  postId?: string
+  userId?: string
   onClose: () => void
   onSent: () => void
 }
 
-function ReportModal({ postId, onClose, onSent }: Props) {
+function ReportModal({ postId, userId, onClose, onSent }: Props) {
   const [reason, setReason] = useState('')
   const [comment, setComment] = useState('')
 
@@ -24,7 +25,8 @@ function ReportModal({ postId, onClose, onSent }: Props) {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       await supabase.from('reports').insert({
-        post_id: postId,
+        post_id: postId ?? null,
+        reported_user_id: userId ?? null,
         reporter_id: user.id,
         reason,
         comment: comment.trim() || null,
@@ -36,9 +38,9 @@ function ReportModal({ postId, onClose, onSent }: Props) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, backdropFilter: 'blur(4px)', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#1c1c1f', borderRadius: 20, padding: '28px 20px 20px', width: '100%', maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, textAlign: 'center', margin: '0 0 6px' }}>Пожаловаться</h3>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', margin: '0 0 20px' }}>Выберите причину жалобы</p>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 20, padding: '28px 20px 20px', width: '100%', maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ color: 'var(--text)', fontSize: 18, fontWeight: 600, textAlign: 'center', margin: '0 0 6px' }}>Пожаловаться</h3>
+        <p style={{ color: 'rgba(var(--t),0.35)', fontSize: 13, textAlign: 'center', margin: '0 0 20px' }}>Выберите причину жалобы</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           {REASONS.map(r => (
@@ -48,19 +50,19 @@ function ReportModal({ postId, onClose, onSent }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '13px 14px', borderRadius: 12,
-                border: `1px solid ${reason === r ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                background: reason === r ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${reason === r ? 'rgba(var(--t),0.25)' : 'rgba(var(--t),0.08)'}`,
+                background: reason === r ? 'rgba(var(--t),0.06)' : 'rgba(var(--t),0.03)',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
               }}
             >
               <span style={{
                 width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                border: `2px solid ${reason === r ? '#fff' : 'rgba(255,255,255,0.25)'}`,
+                border: `2px solid ${reason === r ? 'var(--text)' : 'rgba(var(--t),0.25)'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {reason === r && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', display: 'block' }}/>}
+                {reason === r && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--text)', display: 'block' }}/>}
               </span>
-              <span style={{ fontSize: 14, color: reason === r ? '#fff' : 'rgba(255,255,255,0.7)' }}>{r}</span>
+              <span style={{ fontSize: 14, color: reason === r ? 'var(--text)' : 'rgba(var(--t),0.7)' }}>{r}</span>
             </button>
           ))}
         </div>
@@ -71,17 +73,17 @@ function ReportModal({ postId, onClose, onSent }: Props) {
           placeholder="Опишите подробнее (необязательно)..."
           style={{
             width: '100%', padding: '12px 14px', borderRadius: 12, boxSizing: 'border-box',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#fff', fontFamily: 'inherit', fontSize: 13, resize: 'none', outline: 'none',
+            background: 'rgba(var(--t),0.04)', border: '1px solid rgba(var(--t),0.08)',
+            color: 'var(--text)', fontFamily: 'inherit', fontSize: 13, resize: 'none', outline: 'none',
             minHeight: 80, marginBottom: 16,
           }}
         />
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '14px 0', borderRadius: 14, border: 'none', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', fontFamily: 'inherit', fontSize: 14, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '14px 0', borderRadius: 14, border: 'none', background: 'rgba(var(--t),0.08)', color: 'rgba(var(--t),0.7)', fontFamily: 'inherit', fontSize: 14, cursor: 'pointer' }}>
             Отмена
           </button>
-          <button onClick={submit} disabled={!reason} style={{ flex: 1, padding: '14px 0', borderRadius: 14, border: 'none', background: reason ? '#fff' : 'rgba(255,255,255,0.15)', color: reason ? '#151518' : 'rgba(255,255,255,0.3)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: reason ? 'pointer' : 'default', transition: 'all 0.15s' }}>
+          <button onClick={submit} disabled={!reason} style={{ flex: 1, padding: '14px 0', borderRadius: 14, border: 'none', background: reason ? 'var(--btn-bg)' : 'rgba(var(--t),0.15)', color: reason ? 'var(--btn-text)' : 'rgba(var(--t),0.3)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: reason ? 'pointer' : 'default', transition: 'all 0.15s' }}>
             Отправить
           </button>
         </div>

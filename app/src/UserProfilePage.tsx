@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { ChevronLeft, Eye, MessageCircle } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, Eye, MessageCircle, MoreHorizontal, Ban, Flag, CheckCircle, X } from 'lucide-react'
+import ReportModal from './ReportModal'
 import ImageViewer from './ImageViewer'
 import { supabase } from './lib/supabase'
 import type { Post, Poll } from './Home'
@@ -102,6 +103,20 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
   const [followingCount, setFollowingCount] = useState(0)
   const [followsModal, setFollowsModal] = useState<'followers' | 'following' | null>(null)
   const [profileReady, setProfileReady] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState(false)
+  const [blockToast, setBlockToast] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [isBlockedByThem, setIsBlockedByThem] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -183,12 +198,32 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
 
   const loadFollowState = async () => {
     if (!myUserId || myUserId === userId) { setIsFollowing(false); setIsFollowedBack(false); return }
-    const [{ data: fwd }, { data: back }] = await Promise.all([
+    const [{ data: fwd }, { data: back }, { data: iBlocked }, { data: theyBlocked }] = await Promise.all([
       supabase.from('follows').select('id').eq('follower_id', myUserId).eq('following_id', userId).maybeSingle(),
       supabase.from('follows').select('id').eq('follower_id', userId).eq('following_id', myUserId).maybeSingle(),
+      supabase.from('blocks').select('id').eq('blocker_id', myUserId).eq('blocked_id', userId).maybeSingle(),
+      supabase.from('blocks').select('id').eq('blocker_id', userId).eq('blocked_id', myUserId).maybeSingle(),
     ])
     setIsFollowing(!!fwd)
     setIsFollowedBack(!!back)
+    setIsBlocked(!!iBlocked)
+    setIsBlockedByThem(!!theyBlocked)
+  }
+
+  const blockUser = async () => {
+    if (!myUserId) return
+    await supabase.from('blocks').upsert({ blocker_id: myUserId, blocked_id: userId }, { onConflict: 'blocker_id,blocked_id', ignoreDuplicates: true })
+    setIsBlocked(true)
+    setMenuOpen(false)
+    setBlockToast(true)
+    setTimeout(() => setBlockToast(false), 3000)
+  }
+
+  const unblockUser = async () => {
+    if (!myUserId) return
+    await supabase.from('blocks').delete().eq('blocker_id', myUserId).eq('blocked_id', userId)
+    setIsBlocked(false)
+    setMenuOpen(false)
   }
 
   const toggleFollow = async () => {
@@ -239,6 +274,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
 
   return (
     <>
+      {reporting && <ReportModal userId={userId} onClose={() => setReporting(false)} onSent={() => setReported(true)}/>}
       {viewerImages.length > 0 && <ImageViewer imageUrls={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerImages([])}/>}
       {followsModal && (
         <FollowsModal userId={userId} type={followsModal} onClose={() => setFollowsModal(null)} onOpenProfile={onOpenProfile}/>
@@ -255,6 +291,13 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
       {!profileReady ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
           <div className="spinner"/>
+        </div>
+      ) : (isBlockedByThem || isBlocked) ? (
+        <div className="profile-empty" style={{ padding: '60px 20px' }}>
+          <Ban size={36} strokeWidth={1.2} style={{ color: 'rgba(var(--t),0.15)', margin: '0 auto 12px', display: 'block' }}/>
+          <p style={{ textAlign: 'center', color: 'rgba(var(--t),0.3)', fontSize: 14 }}>
+            {isBlocked ? 'Вы заблокировали этого пользователя' : 'Этот профиль недоступен'}
+          </p>
         </div>
       ) : (<>
 
@@ -285,12 +328,36 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
           <span className={`profile-online${profile?.last_seen && (Date.now() - new Date(profile.last_seen).getTime()) < 5 * 60 * 1000 ? '' : ' profile-online--offline'}`}/>
         </div>
         {myUserId && myUserId !== userId && (
-          <button
-            className={`profile-follow-btn${isFollowing ? ' profile-follow-btn--active' : ''}`}
-            onClick={toggleFollow}
-          >
-            {isFollowing ? 'Отписаться' : 'Подписаться'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <div ref={menuRef} className="post-menu-wrap" style={{ alignSelf: 'flex-end', marginBottom: -8 }}>
+              {(blockToast || reported) && (
+                <div className="toast toast--success">
+                  <CheckCircle size={18} strokeWidth={2}/>
+                  <span>{blockToast ? 'Пользователь заблокирован' : 'Жалоба отправлена'}</span>
+                  <button className="toast-close" onClick={() => { setBlockToast(false); setReported(false) }}><X size={14} strokeWidth={2}/></button>
+                </div>
+              )}
+              <button className="post-menu-btn" onClick={() => setMenuOpen(o => !o)} style={{ width: 38, height: 38, borderRadius: 18, background: 'rgba(var(--t),0.07)', color: 'rgba(var(--t),0.6)' }}>
+                <MoreHorizontal size={18} strokeWidth={1.8}/>
+              </button>
+              {menuOpen && (
+                <div className="post-menu-dropdown">
+                  <button className="post-menu-item post-menu-item--danger" onClick={isBlocked ? unblockUser : blockUser}>
+                    <Ban size={14}/> {isBlocked ? 'Разблокировать' : 'Заблокировать'}
+                  </button>
+                  <button className="post-menu-item post-menu-item--danger" onClick={() => { setMenuOpen(false); setReporting(true) }}>
+                    <Flag size={14}/> Пожаловаться
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              className={`profile-follow-btn${isFollowing ? ' profile-follow-btn--active' : ''}`}
+              onClick={toggleFollow}
+            >
+              {isFollowing ? 'Отписаться' : 'Подписаться'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -347,7 +414,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
 
       </>)}
 
-      {profileReady && tab === 'posts' && (
+      {profileReady && !isBlockedByThem && !isBlocked && tab === 'posts' && (
         loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
             <div className="spinner"/>
@@ -363,7 +430,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
                 <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>
                   {post.avatar_url
                     ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                    : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                    : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="var(--bg-input)"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(var(--t),0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
                   }
                 </div>
                 <div className="post-meta">
@@ -406,7 +473,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
         )
       )}
 
-      {profileReady && tab === 'likes' && (
+      {profileReady && !isBlockedByThem && !isBlocked && tab === 'likes' && (
         <div className="profile-empty"><p>Нет лайкнутых постов</p></div>
       )}
 

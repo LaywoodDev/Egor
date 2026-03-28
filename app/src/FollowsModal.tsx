@@ -64,14 +64,14 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
       onClick={onClose}
     >
       <div
-        style={{ background: '#1e1e22', borderRadius: 20, width: '90%', maxWidth: 400, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+        style={{ background: 'var(--bg-card)', borderRadius: 20, width: '90%', maxWidth: 400, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px' }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
             {type === 'followers' ? 'Подписчики' : 'Подписки'}
           </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(var(--t),0.4)', cursor: 'pointer', padding: 4, display: 'flex' }}>
             <X size={18}/>
           </button>
         </div>
@@ -82,7 +82,7 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
               <div className="spinner"/>
             </div>
           ) : users.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14, padding: '24px 0 32px' }}>
+            <p style={{ textAlign: 'center', color: 'rgba(var(--t),0.3)', fontSize: 14, padding: '24px 0 32px' }}>
               {type === 'followers' ? 'Нет подписчиков' : 'Нет подписок'}
             </p>
           ) : (
@@ -91,7 +91,7 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
                 key={user.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', cursor: 'pointer' }}
                 onClick={() => { onOpenProfile(user.id); onClose() }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(var(--t),0.04)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <div style={{ flexShrink: 0 }}>
@@ -107,7 +107,7 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.display_name}</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.display_name}</span>
                     {user.verified && (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                         <rect x="2" y="2" width="20" height="20" rx="6" fill="#1DA1F2"/>
@@ -115,7 +115,7 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
                       </svg>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>@{user.username}</div>
+                  <div style={{ fontSize: 13, color: 'rgba(var(--t),0.4)' }}>@{user.username}</div>
                 </div>
               </div>
             ))

@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { motion, useInView } from 'motion/react'
-import { Home as HomeIcon, LayoutGrid, Search, User, LogOut, MessageCircle, Eye, Bell } from 'lucide-react'
+import { Home as HomeIcon, Search, User, LogOut, MessageCircle, Eye, Bell } from 'lucide-react'
 import { linkify } from './linkify'
 import { openMention } from './mentionHelper'
 import PostPage from './PostPage'
 import PostMenu from './PostMenu'
 import { supabase } from './lib/supabase'
-import Categories from './Categories'
 import CategoryPage from './CategoryPage'
+import ChangelogModal from './ChangelogModal'
 import SearchPage from './SearchPage'
 import ProfilePage from './ProfilePage'
 import UserProfilePage from './UserProfilePage'
@@ -230,7 +230,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
   )
 }
 
-type NavItem = 'home' | 'categories' | 'search' | 'notifications' | 'profile'
+type NavItem = 'home' | 'search' | 'notifications' | 'profile'
 
 interface NotifToastData {
   id: string
@@ -244,17 +244,23 @@ interface NotifToastData {
 function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [active, setActive] = useState<NavItem>('home')
   const [homeTab, setHomeTab] = useState<'forYou' | 'subs'>('forYou')
+  const PAGE_SIZE = 10
   const [posts, setPosts] = useState<Post[]>([])
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
   const [userId, setUserId] = useState<string>('')
   const [fetchingPosts, setFetchingPosts] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const postsOffsetRef = useRef(0)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
   const [viewingCategory, setViewingCategory] = useState<string | null>(null)
+  const [showChangelog, setShowChangelog] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
@@ -359,6 +365,16 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   }, [userId])
 
   useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadMorePosts()
+    }, { threshold: 0.1 })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore])
+
+  useEffect(() => {
     if (!userId) return
     loadLikedIds()
     loadFollowingIds()
@@ -380,50 +396,83 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     if (!error && data) setProfile(data)
   }
 
+  const parsePosts = (data: any[], myId: string | undefined, votes: any[]) =>
+    data.map((p: any) => {
+      const options: string[] = p.poll?.options ?? []
+      const vote_counts = Array(options.length).fill(0)
+      let my_vote: number | undefined
+      votes?.filter((v: any) => v.post_id === p.id).forEach((v: any) => {
+        if (v.option_index < options.length) vote_counts[v.option_index]++
+        if (v.user_id === myId) my_vote = v.option_index
+      })
+      return {
+        id: p.id, user_id: p.user_id, text: p.text,
+        image_url: p.image_url, created_at: p.created_at,
+        like_count: p.likes?.length ?? 0, view_count: p.view_count ?? 0,
+        mine: p.user_id === myId,
+        display_name: p.profiles?.display_name ?? 'Пользователь',
+        username: p.profiles?.username ?? '',
+        avatar_url: p.profiles?.avatar_url ?? undefined,
+        poll: p.poll ? { options, vote_counts, my_vote } : undefined,
+        category: p.category ?? undefined,
+        verified: p.profiles?.verified ?? false,
+      }
+    })
+
   const loadPosts = async () => {
     setFetchingPosts(true)
+    postsOffsetRef.current = 0
+    setHasMore(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const myId = user?.id
-
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('posts')
         .select('*, profiles!posts_user_id_fkey(display_name, username, avatar_url, verified), likes(id)')
         .order('created_at', { ascending: false })
-
-      console.log('posts:', data, 'error:', error)
-
-      const { data: votes } = await supabase
-        .from('poll_votes')
-        .select('post_id, user_id, option_index')
-
+        .range(0, PAGE_SIZE - 1)
       if (data) {
-        setPosts(data.map((p: any) => {
-          const options: string[] = p.poll?.options ?? []
-          const vote_counts = Array(options.length).fill(0)
-          let my_vote: number | undefined
-          votes?.filter((v: any) => v.post_id === p.id).forEach((v: any) => {
-            if (v.option_index < options.length) vote_counts[v.option_index]++
-            if (v.user_id === myId) my_vote = v.option_index
-          })
-          return {
-            id: p.id, user_id: p.user_id, text: p.text,
-            image_url: p.image_url, created_at: p.created_at,
-            like_count: p.likes?.length ?? 0, view_count: p.view_count ?? 0,
-            mine: p.user_id === myId,
-            display_name: p.profiles?.display_name ?? 'Пользователь',
-            username: p.profiles?.username ?? '',
-            avatar_url: p.profiles?.avatar_url ?? undefined,
-            poll: p.poll ? { options, vote_counts, my_vote } : undefined,
-            category: p.category ?? undefined,
-            verified: p.profiles?.verified ?? false,
-          }
-        }))
+        const ids = data.map((p: any) => p.id)
+        const { data: votes } = await supabase.from('poll_votes').select('post_id, user_id, option_index').in('post_id', ids)
+        setPosts(parsePosts(data, myId, votes ?? []))
+        postsOffsetRef.current = data.length
+        setHasMore(data.length === PAGE_SIZE)
       }
     } catch (e) {
       console.error('loadPosts error:', e)
     } finally {
       setFetchingPosts(false)
+    }
+  }
+
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const myId = user?.id
+      const from = postsOffsetRef.current
+      const { data } = await supabase
+        .from('posts')
+        .select('*, profiles!posts_user_id_fkey(display_name, username, avatar_url, verified), likes(id)')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (data) {
+        const ids = data.map((p: any) => p.id)
+        const { data: votes } = ids.length > 0
+          ? await supabase.from('poll_votes').select('post_id, user_id, option_index').in('post_id', ids)
+          : { data: [] }
+        setPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.id))
+          return [...prev, ...parsePosts(data, myId, votes ?? []).filter(p => !existingIds.has(p.id))]
+        })
+        postsOffsetRef.current = from + data.length
+        setHasMore(data.length === PAGE_SIZE)
+      }
+    } catch (e) {
+      console.error('loadMorePosts error:', e)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -465,7 +514,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
         username: data.profiles?.username ?? '',
         poll: data.poll ? { options: data.poll.options, vote_counts: Array(data.poll.options.length).fill(0) } : undefined,
       }
-      setPosts(prev => [newPost, ...prev])
+      setPosts(prev => prev.some(p => p.id === newPost.id) ? prev : [newPost, ...prev])
 
       // Send mention notifications
       const mentions = [...new Set((text.match(/@([a-zA-Z0-9_]+)/g) ?? []).map(m => m.slice(1)))]
@@ -533,13 +582,11 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
 
   const navItems: { id: NavItem; label: string; icon: JSX.Element; badge?: number }[] = [
     { id: 'home',          label: 'Главная',      icon: <HomeIcon size={20}/> },
-    { id: 'categories',    label: 'Категории',    icon: <LayoutGrid size={20}/> },
     { id: 'search',        label: 'Поиск',        icon: <Search size={20}/> },
     { id: 'notifications', label: 'Уведомления',  icon: <Bell size={20}/>, badge: unreadCount },
     { id: 'profile',       label: 'Профиль',      icon: <User size={20}/> },
   ]
 
-  const myPosts = posts.filter(p => p.mine)
   const subscriptionPosts = posts.filter(p => followingIds.has(p.user_id))
 
   const notifActionText = (type: NotifToastData['type']) => {
@@ -551,6 +598,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   return (
     <div className="home-layout">
       {viewerImages.length > 0 && <ImageViewer imageUrls={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerImages([])}/>}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)}/>}
 
       {notifToasts.length > 0 && (
         <div className="notif-toasts">
@@ -559,7 +607,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
               <div className="notif-toast-avatar">
                 {toast.actorAvatar
                   ? <img src={toast.actorAvatar} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                  : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#3a3a44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: '#fff' }}>{toast.actorName.charAt(0).toUpperCase()}</div>
+                  : <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: 'var(--text)' }}>{toast.actorName.charAt(0).toUpperCase()}</div>
                 }
                 <span className="notif-toast-type-icon" style={{ background: toast.type === 'like' ? '#ef4444' : toast.type === 'comment' ? '#3b82f6' : '#a78bfa' }}>
                   {toast.type === 'like' ? '♥' : toast.type === 'comment' ? '💬' : '@'}
@@ -577,12 +625,21 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
 
       <div className="home-inner">
         <aside className="sidebar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '-8px 0 20px 20px' }}>
+            <img src="/egor-logo.svg" alt="Egor" className="sidebar-logo" style={{ margin: 0 }}/>
+            <span
+              onClick={() => setShowChangelog(true)}
+              style={{ fontSize: 13, color: 'rgba(var(--t),0.3)', fontWeight: 500, letterSpacing: '0.02em', whiteSpace: 'nowrap', cursor: 'pointer', transition: 'color 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(var(--t),0.6)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(var(--t),0.3)')}
+            >V1.0.0</span>
+          </div>
           <nav className="sidebar-nav">
             {navItems.map(item => (
               <button
                 key={item.id}
                 className={`nav-item${active === item.id ? ' nav-item--active' : ''}`}
-                onClick={() => { setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null); if (item.id === 'notifications') { setUnreadCount(0); localStorage.setItem('notif_last_read', new Date().toISOString()) } }}
+                onClick={() => { if (item.id === 'home' && active === 'home' && !selectedPost && !viewingUserId && !viewingCategory) { loadPosts(); return } setActive(item.id); setSelectedPost(null); setViewingUserId(null); setViewingCategory(null); if (item.id === 'notifications') { setUnreadCount(0); localStorage.setItem('notif_last_read', new Date().toISOString()) } }}
                 style={{ position: 'relative' }}
               >
                 {item.icon}
@@ -650,13 +707,10 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
               />
             ) : active === 'admin' ? (
               <AdminPanel/>
-            ) : active === 'categories' ? (
-              <Categories onSelect={id => setViewingCategory(id)}/>
             ) : active === 'search' ? (
-              <SearchPage onOpenPost={post => setSelectedPost(post)} onOpenProfile={handleOpenProfile}/>
+              <SearchPage onOpenPost={post => setSelectedPost(post)} onOpenProfile={handleOpenProfile} onSelectCategory={id => setViewingCategory(id)}/>
             ) : active === 'profile' ? (
               <ProfilePage
-                posts={myPosts}
                 likedIds={likedIds}
                 onAddPost={addPost}
                 onLike={toggleLike}
@@ -721,6 +775,11 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                       </AnimatedPost>
                     ))
                   )
+                )}
+                {homeTab === 'forYou' && !fetchingPosts && (
+                  <div ref={sentinelRef} style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+                    {loadingMore && <div className="spinner"/>}
+                  </div>
                 )}
               </>
             )}

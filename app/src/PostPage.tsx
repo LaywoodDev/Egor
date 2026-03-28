@@ -101,7 +101,7 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
               ? <img src={myAvatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}/>
               : post.avatar_url
                 ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}/>
-                : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="var(--bg-input)"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(var(--t),0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
             }
           </div>
           <div className="post-meta">
@@ -111,7 +111,7 @@ function PostPage({ post, liked, myAvatarUrl, onBack, onLike, onVote, onOpenProf
             </span>
             <span className="post-time">{timeAgo(post.created_at)}</span>
             {post.category && (
-              <span style={{ fontSize: 11, opacity: 0.8, color: ({ ask: '#a78bfa', memes: '#f59e0b', gallery: '#34d399', video: '#f87171' } as Record<string,string>)[post.category] ?? 'rgba(255,255,255,0.4)' }}>
+              <span style={{ fontSize: 11, opacity: 0.8, color: ({ ask: '#a78bfa', memes: '#f59e0b', gallery: '#34d399', video: '#f87171' } as Record<string,string>)[post.category] ?? 'rgba(var(--t),0.4)' }}>
                 {({ ask: 'Спросить Егора', memes: 'Мемы', gallery: 'Галерея', video: 'Видео' } as Record<string,string>)[post.category]}
               </span>
             )}

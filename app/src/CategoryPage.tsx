@@ -151,24 +151,24 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
               style={{
                 padding: '7px 16px', borderRadius: 18, border: 'none', cursor: 'pointer',
                 fontFamily: 'inherit', fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
-                background: filter === f ? '#ffffff' : 'rgba(255,255,255,0.07)',
-                color: filter === f ? '#151518' : 'rgba(255,255,255,0.5)',
+                background: filter === f ? 'var(--btn-bg)' : 'rgba(var(--t),0.07)',
+                color: filter === f ? 'var(--btn-text)' : 'rgba(var(--t),0.5)',
               }}
             >
               {f === 'new' ? 'Новые' : 'Популярные'}
             </button>
           ))}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.07)', borderRadius: 18, padding: '7px 14px', gap: 7, flex: 1 }}>
-            <Search size={14} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(var(--t),0.07)', borderRadius: 18, padding: '7px 14px', gap: 7, flex: 1 }}>
+            <Search size={14} style={{ color: 'rgba(var(--t),0.35)', flexShrink: 0 }}/>
             <input
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Поиск в категории..."
-              style={{ background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit', width: '100%' }}
+              style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit', width: '100%' }}
             />
             {query && (
-              <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, display: 'flex' }}>
+              <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(var(--t),0.35)', padding: 0, display: 'flex' }}>
                 <X size={13}/>
               </button>
             )}
@@ -190,7 +190,7 @@ function CategoryPage({ categoryId, onBack, onOpenPost, onOpenProfile }: Props) 
                   <div className="post-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(post.user_id)}>
                     {post.avatar_url
                       ? <img src={post.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                      : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#2a2a30"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(255,255,255,0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
+                      : <svg width="36" height="36" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="var(--bg-input)"/><text x="18" y="23" textAnchor="middle" fontSize="14" fill="rgba(var(--t),0.7)">{post.display_name?.charAt(0).toUpperCase() || '?'}</text></svg>
                     }
                   </div>
                   <div className="post-meta">

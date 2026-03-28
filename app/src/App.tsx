@@ -112,12 +112,12 @@ function App() {
 
   if (page === 'banned') {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#131315', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 0 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 500, color: '#fff', margin: '0 0 8px', textAlign: 'center' }}>Аккаунт заблокирован</h2>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: '0 0 28px', textAlign: 'center' }}>Вы нарушили правила сервиса.</p>
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 0 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 500, color: 'var(--text)', margin: '0 0 8px', textAlign: 'center' }}>Аккаунт заблокирован</h2>
+        <p style={{ color: 'rgba(var(--t),0.35)', fontSize: 14, margin: '0 0 28px', textAlign: 'center' }}>Вы нарушили правила сервиса.</p>
         <button
           onClick={() => supabase.auth.signOut().then(() => setPage('signin'))}
-          style={{ width: 320, padding: '18px 0', borderRadius: 18, border: 'none', background: '#ffffff', color: '#1a1a1a', cursor: 'pointer', fontSize: 15, fontWeight: 500, fontFamily: 'inherit', marginBottom: 20 }}
+          style={{ width: 320, padding: '18px 0', borderRadius: 18, border: 'none', background: 'var(--text)', color: '#1a1a1a', cursor: 'pointer', fontSize: 15, fontWeight: 500, fontFamily: 'inherit', marginBottom: 20 }}
         >
           Выйти
         </button>

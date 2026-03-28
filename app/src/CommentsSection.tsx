@@ -73,7 +73,7 @@ function CommentItem({ node, depth, replyingToId, replyText, setReplyText, onRep
           <div className="comment-avatar" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile?.(node.user_id)}>
             {node.avatar_url
               ? <img src={node.avatar_url} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-              : <svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="15" fill="#2a2a30"/><text x="15" y="20" textAnchor="middle" fontSize="12" fill="rgba(255,255,255,0.7)">{node.display_name.charAt(0).toUpperCase()}</text></svg>
+              : <svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="15" fill="var(--bg-input)"/><text x="15" y="20" textAnchor="middle" fontSize="12" fill="rgba(var(--t),0.7)">{node.display_name.charAt(0).toUpperCase()}</text></svg>
             }
           </div>
           {showThread && <div className="comment-thread-line"/>}
