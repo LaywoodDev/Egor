@@ -54,6 +54,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const [notifLikes, setNotifLikes] = useState(profile?.notif_likes ?? true)
   const [notifComments, setNotifComments] = useState(profile?.notif_comments ?? true)
   const [notifMentions, setNotifMentions] = useState(profile?.notif_mentions ?? true)
+  const [notifSound, setNotifSound] = useState(() => localStorage.getItem('notif_sound') !== 'false')
 
   // Security
   const [pwdError, setPwdError] = useState('')
@@ -419,6 +420,22 @@ function Settings({ profile, onClose, onSaved }: Props) {
 
               <div className="settings-row" style={{ opacity: notifEnabled ? 1 : 0.4, pointerEvents: notifEnabled ? 'auto' : 'none' }}>
                 <div className="settings-row-label">
+                  <span className="settings-row-title">Звук</span>
+                  <span className="settings-row-hint">Воспроизводить звук при уведомлении</span>
+                </div>
+                <label className="settings-toggle">
+                  <input type="checkbox" checked={notifSound} onChange={e => {
+                    setNotifSound(e.target.checked)
+                    localStorage.setItem('notif_sound', String(e.target.checked))
+                  }}/>
+                  <span className="settings-toggle-track"/>
+                </label>
+              </div>
+
+              <div className="settings-divider" style={{ opacity: notifEnabled ? 1 : 0.4 }}/>
+
+              <div className="settings-row" style={{ opacity: notifEnabled ? 1 : 0.4, pointerEvents: notifEnabled ? 'auto' : 'none' }}>
+                <div className="settings-row-label">
                   <span className="settings-row-title">Лайки</span>
                   <span className="settings-row-hint">Когда кто-то лайкает ваш пост</span>
                 </div>
@@ -462,6 +479,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
                   <span className="settings-toggle-track"/>
                 </label>
               </div>
+
             </div>
           )}
 

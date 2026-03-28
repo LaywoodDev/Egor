@@ -232,6 +232,15 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
 
 type NavItem = 'home' | 'categories' | 'search' | 'notifications' | 'profile'
 
+interface NotifToastData {
+  id: string
+  type: 'like' | 'comment' | 'mention'
+  actorName: string
+  actorAvatar?: string
+  text?: string
+  exiting?: boolean
+}
+
 function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [active, setActive] = useState<NavItem>('home')
   const [homeTab, setHomeTab] = useState<'forYou' | 'subs'>('forYou')
@@ -251,7 +260,16 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [pendingPostId, setPendingPostId] = useState<string | null>(null)
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [notifToasts, setNotifToasts] = useState<NotifToastData[]>([])
   const feedWrapperRef = useRef<HTMLDivElement | null>(null)
+
+  const showNotifToast = (toast: NotifToastData) => {
+    setNotifToasts(prev => [...prev, toast])
+    setTimeout(() => {
+      setNotifToasts(prev => prev.map(t => t.id === toast.id ? { ...t, exiting: true } : t))
+      setTimeout(() => setNotifToasts(prev => prev.filter(t => t.id !== toast.id)), 350)
+    }, 4000)
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -276,6 +294,69 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     if (pendingProfileId !== userId) setViewingUserId(pendingProfileId)
     setPendingProfileId(null)
   }, [pendingProfileId, userId])
+
+  useEffect(() => {
+    if (!userId) return
+
+    let prevCount = -1
+    const audio = new Audio('/Sounds/Notification.mp3')
+    audio.volume = 0.6
+    audio.preload = 'auto'
+
+    const unlock = () => {
+      audio.play().then(() => { audio.pause(); audio.currentTime = 0; console.log('[notif] audio unlocked') }).catch(e => console.warn('[notif] unlock failed', e))
+    }
+    document.addEventListener('pointerdown', unlock, { once: true })
+
+    const playSound = () => {
+      if (localStorage.getItem('notif_sound') === 'false') return
+      audio.currentTime = 0
+      audio.play().then(() => console.log('[notif] sound played')).catch(e => console.warn('[notif] play failed', e))
+    }
+
+    const checkNotifs = async () => {
+      const { data, count } = await supabase
+        .from('user_notifications')
+        .select('id, type, actor_id, post_id, profiles!actor_id(display_name, avatar_url)', { count: 'exact' })
+        .eq('user_id', userId)
+        .eq('read', false)
+        .order('created_at', { ascending: false })
+      const newCount = count ?? 0
+      if (prevCount !== -1 && newCount > prevCount && data) {
+        playSound()
+        const diff = data.slice(0, newCount - prevCount)
+        diff.forEach(n => {
+          const actor = (n.profiles as any)
+          const typeMap: Record<string, 'like' | 'comment' | 'mention'> = { like: 'like', comment: 'comment', mention: 'mention' }
+          showNotifToast({
+            id: n.id,
+            type: typeMap[n.type] ?? 'like',
+            actorName: actor?.display_name ?? 'Кто-то',
+            actorAvatar: actor?.avatar_url,
+          })
+        })
+      }
+      prevCount = newCount
+      setUnreadCount(newCount)
+    }
+
+    checkNotifs()
+    const interval = setInterval(checkNotifs, 8000)
+
+    const channel = supabase
+      .channel('user-notifications-' + userId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${userId}` }, () => {
+        console.log('[notif] realtime event received')
+        checkNotifs()
+      })
+      .subscribe()
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('pointerdown', unlock)
+      supabase.removeChannel(channel)
+    }
+  }, [userId])
 
   useEffect(() => {
     if (!userId) return
@@ -461,9 +542,38 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const myPosts = posts.filter(p => p.mine)
   const subscriptionPosts = posts.filter(p => followingIds.has(p.user_id))
 
+  const notifActionText = (type: NotifToastData['type']) => {
+    if (type === 'like') return 'оценил(а) ваш пост'
+    if (type === 'comment') return 'прокомментировал(а) ваш пост'
+    return 'упомянул(а) вас'
+  }
+
   return (
     <div className="home-layout">
       {viewerImages.length > 0 && <ImageViewer imageUrls={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerImages([])}/>}
+
+      {notifToasts.length > 0 && (
+        <div className="notif-toasts">
+          {notifToasts.map(toast => (
+            <div key={toast.id} className={`notif-toast${toast.exiting ? ' notif-toast--exit' : ''}`}>
+              <div className="notif-toast-avatar">
+                {toast.actorAvatar
+                  ? <img src={toast.actorAvatar} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
+                  : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#3a3a44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: '#fff' }}>{toast.actorName.charAt(0).toUpperCase()}</div>
+                }
+                <span className="notif-toast-type-icon" style={{ background: toast.type === 'like' ? '#ef4444' : toast.type === 'comment' ? '#3b82f6' : '#a78bfa' }}>
+                  {toast.type === 'like' ? '♥' : toast.type === 'comment' ? '💬' : '@'}
+                </span>
+              </div>
+              <div className="notif-toast-body">
+                <span className="notif-toast-name">{toast.actorName}</span>
+                <span className="notif-toast-action">{notifActionText(toast.type)}</span>
+              </div>
+              <button className="notif-toast-close" onClick={() => setNotifToasts(prev => prev.filter(t => t.id !== toast.id))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="home-inner">
         <aside className="sidebar">
@@ -491,7 +601,19 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
           </button>
         </aside>
 
-        <div className="feed-wrapper" ref={feedWrapperRef}>
+        <div className="feed-area">
+        {!selectedPost && !viewingUserId && !viewingCategory && active === 'home' && (
+          <div className="home-tabs-float">
+            <div className="profile-tabs-wrap home-tabs-wrap">
+              <div className="profile-tabs">
+                <div className="profile-tab-slider" style={{ transform: `translateX(${homeTab === 'subs' ? '100%' : '0%'})` }}/>
+                <button className={`profile-tab${homeTab === 'forYou' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('forYou')}>Для вас</button>
+                <button className={`profile-tab${homeTab === 'subs' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('subs')}>Подписки</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="feed-wrapper" ref={feedWrapperRef} style={!selectedPost && !viewingUserId && !viewingCategory && active === 'home' ? { paddingTop: 72 } : undefined}>
           <main className="feed">
             {selectedPost ? (
               <PostPage
@@ -552,21 +674,6 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
               />
             ) : (
               <>
-                <div className="profile-tabs-wrap home-tabs-wrap">
-                  <div className="profile-tabs">
-                    <div
-                      className="profile-tab-slider"
-                      style={{ transform: `translateX(${homeTab === 'subs' ? '100%' : '0%'})` }}
-                    />
-                    <button className={`profile-tab${homeTab === 'forYou' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('forYou')}>
-                      Для вас
-                    </button>
-                    <button className={`profile-tab${homeTab === 'subs' ? ' profile-tab--active' : ''}`} onClick={() => setHomeTab('subs')}>
-                      Подписки
-                    </button>
-                  </div>
-                </div>
-
                 {homeTab === 'forYou' ? (
                   <>
                     <Composer onPublish={addPost} avatarUrl={profile?.avatar_url}/>
@@ -618,6 +725,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
               </>
             )}
           </main>
+        </div>
         </div>
 
         <aside className="right-sidebar">

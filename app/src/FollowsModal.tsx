@@ -25,21 +25,33 @@ function FollowsModal({ userId, type, onClose, onOpenProfile }: Props) {
     const load = async () => {
       setLoading(true)
       if (type === 'followers') {
-        const { data } = await supabase
+        const { data: rows } = await supabase
           .from('follows')
-          .select('profiles!follows_follower_id_fkey(id, display_name, username, avatar_url, verified)')
+          .select('follower_id')
           .eq('following_id', userId)
           .order('created_at', { ascending: false })
-          .limit(10)
-        if (data) setUsers(data.map((r: any) => r.profiles).filter(Boolean))
+        const ids = (rows ?? []).map((r: any) => r.follower_id)
+        if (ids.length > 0) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('id, display_name, username, avatar_url, verified')
+            .in('id', ids)
+          if (data) setUsers(data)
+        }
       } else {
-        const { data } = await supabase
+        const { data: rows } = await supabase
           .from('follows')
-          .select('profiles!follows_following_id_fkey(id, display_name, username, avatar_url, verified)')
+          .select('following_id')
           .eq('follower_id', userId)
           .order('created_at', { ascending: false })
-          .limit(10)
-        if (data) setUsers(data.map((r: any) => r.profiles).filter(Boolean))
+        const ids = (rows ?? []).map((r: any) => r.following_id)
+        if (ids.length > 0) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('id, display_name, username, avatar_url, verified')
+            .in('id', ids)
+          if (data) setUsers(data)
+        }
       }
       setLoading(false)
     }
