@@ -143,10 +143,23 @@ function SearchPage({ onOpenPost, onOpenProfile, onSelectCategory }: Props) {
                   {tab === 'all' && <p className="result-section-label">Люди</p>}
                   {users.map(user => (
                     <div key={user.id} className="result-user card" style={{ cursor: 'pointer' }} onClick={() => onOpenProfile(user.id)}>
-                      <div className="post-avatar">
+                      <div className="result-user-avatar">
                         {user.avatar_url
-                          ? <img src={user.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', display: 'block' }}/>
-                          : <svg width="40" height="40" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="url(#sg)"/><defs><radialGradient id="sg" cx="30%" cy="30%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></radialGradient></defs></svg>
+                          ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+                          : (
+                            <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+                              <defs>
+                                <linearGradient id={`sg-${user.id}`} x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor="#2b2f36"/>
+                                  <stop offset="100%" stopColor="#1b1f27"/>
+                                </linearGradient>
+                              </defs>
+                              <circle cx="20" cy="20" r="20" fill={`url(#sg-${user.id})`}/>
+                              <circle cx="20" cy="20" r="19.2" fill="none" stroke="rgba(255,255,255,0.08)"/>
+                              <circle cx="20" cy="16" r="6" fill="rgba(255,255,255,0.6)"/>
+                              <path d="M8 32c2.4-5.8 8.1-8.5 12-8.5S29.6 26.2 32 32" fill="rgba(255,255,255,0.35)"/>
+                            </svg>
+                          )
                         }
                       </div>
                       <div className="result-user-info">

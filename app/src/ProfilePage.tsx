@@ -47,7 +47,7 @@ function parsePost(p: any, myId?: string): Post {
 
 interface Props {
   likedIds: Set<string>
-  onAddPost: (text: string, imageUrl?: string, poll?: string[]) => Promise<void>
+  onAddPost: (text: string, imageUrl?: string | string[], poll?: string[]) => Promise<void>
   onLike: (id: string) => void
   onVote: (postId: string, optionIndex: number) => void
   onOpenPost: (post: Post) => void

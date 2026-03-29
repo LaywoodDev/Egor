@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, type ReactElement } from 'react'
 import { User, Image, X, Check, ShieldCheck, CheckCircle, Lock, ChevronDown, Bell, Sun, Ban } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -40,6 +40,16 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const bannerRef = useRef<HTMLInputElement>(null)
 
   const [saved, setSaved] = useState(false)
+  const settingsLayoutRef = useRef<HTMLDivElement>(null)
+  const settingsContentRef = useRef<HTMLDivElement>(null)
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragStartY = useRef(0)
+  const dragActive = useRef(false)
+  const dragMoved = useRef(false)
+  const [closing, setClosing] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Blocklist
   const BLOCK_PAGE = 20
@@ -111,16 +121,17 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const [notifSound, setNotifSound] = useState(() => localStorage.getItem('notif_sound') !== 'false')
 
   // Appearance
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    (localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark'
+  const [theme, setTheme] = useState<'dark' | 'light' | 'extra-dark'>(() =>
+    (localStorage.getItem('theme') as 'dark' | 'light' | 'extra-dark') ?? 'dark'
   )
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const themeMenuRef = useRef<HTMLDivElement>(null)
-  const applyTheme = (t: 'dark' | 'light') => {
+  const applyTheme = (t: 'dark' | 'light' | 'extra-dark') => {
     setTheme(t)
     setThemeMenuOpen(false)
     localStorage.setItem('theme', t)
     if (t === 'light') document.documentElement.setAttribute('data-theme', 'light')
+    else if (t === 'extra-dark') document.documentElement.setAttribute('data-theme', 'extra-dark')
     else document.documentElement.removeAttribute('data-theme')
   }
 
@@ -175,9 +186,57 @@ function Settings({ profile, onClose, onSaved }: Props) {
     return () => clearTimeout(timer)
   }, [deleteCooldown])
 
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 560px)')
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   const flashSaved = () => {
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
+  }
+
+  const requestClose = () => {
+    if (closing) return
+    setClosing(true)
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null
+      onClose()
+    }, 180)
+  }
+
+  const handleDragStart = (e: React.TouchEvent) => {
+    if (!isMobile) return
+    if (e.touches.length !== 1) return
+    if (settingsContentRef.current && settingsContentRef.current.contains(e.target as Node)) {
+      if (settingsContentRef.current.scrollTop > 0) return
+    }
+    dragActive.current = true
+    dragMoved.current = false
+    dragStartY.current = e.touches[0].clientY
+    setDragging(true)
+    setDragY(0)
+  }
+
+  const handleDragMove = (e: React.TouchEvent) => {
+    if (!dragActive.current) return
+    const dy = e.touches[0].clientY - dragStartY.current
+    const nextY = dy < 0 ? 0 : dy
+    if (nextY > 4) dragMoved.current = true
+    setDragY(nextY)
+    if (nextY > 0 && e.cancelable) e.preventDefault()
+  }
+
+  const handleDragEnd = () => {
+    if (!dragActive.current) return
+    dragActive.current = false
+    setDragging(false)
+    if (dragY > 120) requestClose()
+    else setDragY(0)
   }
 
   const getUser = async () => {
@@ -332,7 +391,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
     window.location.reload()
   }
 
-  const navItems: { id: Section; label: string; icon: JSX.Element }[] = [
+  const navItems: { id: Section; label: string; icon: ReactElement }[] = [
     { id: 'account',       label: 'Аккаунт',      icon: <User size={18} strokeWidth={1.8}/> },
     { id: 'media',         label: 'Медиа',         icon: <Image size={18} strokeWidth={1.8}/> },
     { id: 'appearance',    label: 'Оформление',    icon: <Sun size={18} strokeWidth={1.8}/> },
@@ -344,7 +403,14 @@ function Settings({ profile, onClose, onSaved }: Props) {
   const sectionTitle = { account: 'Аккаунт', media: 'Медиа', appearance: 'Оформление', notifications: 'Уведомления', privacy: 'Приватность', security: 'Безопасность' }
 
   return (
-    <div className="settings-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div
+      className="settings-overlay"
+      style={{ opacity: closing ? 0 : 1, transition: 'opacity 0.18s ease' }}
+      onClick={e => {
+        if (dragMoved.current) { dragMoved.current = false; return }
+        if (e.target === e.currentTarget) requestClose()
+      }}
+    >
       {pwdSuccess && (
         <div className={`toast toast--success${pwdToastExiting ? ' toast--exit' : ''}`} style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1100 }}>
           <CheckCircle size={18} strokeWidth={2}/>
@@ -352,7 +418,25 @@ function Settings({ profile, onClose, onSaved }: Props) {
           <button className="toast-close" onClick={() => { setPwdToastExiting(true); setTimeout(() => { setPwdSuccess(false); setPwdToastExiting(false) }, 300) }}><X size={14} strokeWidth={2}/></button>
         </div>
       )}
-      <div className="settings-layout">
+      <div
+        ref={settingsLayoutRef}
+        className="settings-layout"
+        style={isMobile
+          ? {
+              transform: closing ? 'translateY(16px) scale(0.98)' : `translateY(${dragY}px)`,
+              opacity: closing ? 0 : 1,
+              transition: dragging ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
+            }
+          : {
+              opacity: closing ? 0 : 1,
+              transition: 'opacity 0.2s ease',
+            }
+        }
+        onTouchStart={isMobile ? handleDragStart : undefined}
+        onTouchMove={isMobile ? handleDragMove : undefined}
+        onTouchEnd={isMobile ? handleDragEnd : undefined}
+        onTouchCancel={isMobile ? handleDragEnd : undefined}
+      >
 
         <aside className="settings-sidebar">
           <h2 className="settings-title">Настройки</h2>
@@ -370,7 +454,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
           </nav>
         </aside>
 
-        <div className="settings-content">
+        <div ref={settingsContentRef} className="settings-content">
           <div className="settings-content-header">
             <h3 className="settings-content-title">{sectionTitle[section]}</h3>
             <div className="settings-header-right">
@@ -379,7 +463,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
                   <Check size={13} strokeWidth={2.5}/> Сохранено
                 </span>
               )}
-              <button className="settings-close" onClick={onClose}>
+              <button className="settings-close" onClick={requestClose}>
                 <X size={20} strokeWidth={1.8}/>
               </button>
             </div>
@@ -387,7 +471,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
 
           {section === 'account' && (
             <div className="settings-fields">
-              <div className="settings-row">
+              <div className="settings-row settings-row--stack">
                 <div className="settings-row-label">
                   <span className="settings-row-title">Имя</span>
                   <span className="settings-row-hint">Ваше отображаемое имя</span>
@@ -406,7 +490,7 @@ function Settings({ profile, onClose, onSaved }: Props) {
 
               <div className="settings-divider"/>
 
-              <div className="settings-row">
+              <div className="settings-row settings-row--stack">
                 <div className="settings-row-label">
                   <span className="settings-row-title">Username</span>
                   <span className="settings-row-hint">Ваш идентификатор</span>
@@ -617,13 +701,14 @@ function Settings({ profile, onClose, onSaved }: Props) {
                     className="settings-select-btn"
                     onClick={() => setThemeMenuOpen(v => !v)}
                   >
-                    {theme === 'dark' ? 'Тёмная' : 'Светлая'}
+                    {({ dark: 'Тёмная', light: 'Светлая', 'extra-dark': 'Очень тёмная' } as Record<string,string>)[theme]}
                     <ChevronDown size={14} strokeWidth={2} style={{ transition: 'transform 0.15s', transform: themeMenuOpen ? 'rotate(180deg)' : 'none' }}/>
                   </button>
                   {themeMenuOpen && (
                     <div className="settings-select-menu">
                       {([
                         { value: 'dark' as const, label: 'Тёмная' },
+                        { value: 'extra-dark' as const, label: 'Очень тёмная' },
                         { value: 'light' as const, label: 'Светлая' },
                       ]).map(opt => (
                         <button

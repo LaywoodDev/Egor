@@ -5,7 +5,6 @@ import type { Post, Poll } from './Home'
 import CommentsSection from './CommentsSection'
 import { linkify } from './linkify'
 import { openMention } from './mentionHelper'
-import { supabase } from './lib/supabase'
 import PostMenu from './PostMenu'
 
 interface Props {

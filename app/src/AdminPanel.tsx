@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { supabase } from './lib/supabase'
 import { Trash2, Users, FileText, BarChart2, Ban, BadgeCheck, Pencil, X, Flag, Bell } from 'lucide-react'
 
@@ -41,7 +41,11 @@ interface AdminNotification {
 
 type Tab = 'stats' | 'posts' | 'users' | 'reports' | 'notify'
 
-function AdminPanel() {
+interface Props {
+  onAiMentionChange?: (enabled: boolean) => void
+}
+
+function AdminPanel({ onAiMentionChange }: Props) {
   const [tab, setTab] = useState<Tab>('stats')
   const [posts, setPosts] = useState<AdminPost[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -54,6 +58,9 @@ function AdminPanel() {
   const [notifyTitle, setNotifyTitle] = useState('')
   const [notifyBody, setNotifyBody] = useState('')
   const [notifySending, setNotifySending] = useState(false)
+  const [aiMentionEnabled, setAiMentionEnabled] = useState(false)
+  const [aiMentionLoading, setAiMentionLoading] = useState(true)
+  const [aiMentionSaving, setAiMentionSaving] = useState(false)
 
   useEffect(() => { loadStats() }, [])
   useEffect(() => {
@@ -72,7 +79,35 @@ function AdminPanel() {
       supabase.from('comments').select('*', { count: 'exact', head: true }),
     ])
     setStats({ posts: postsCount ?? 0, users: usersCount ?? 0, likes: likesCount ?? 0, comments: commentsCount ?? 0 })
+    await loadAiSetting()
     setLoading(false)
+  }
+
+  const loadAiSetting = async () => {
+    setAiMentionLoading(true)
+    const { data } = await supabase
+      .from('app_settings')
+      .select('ai_egor_mention_enabled')
+      .eq('id', 1)
+      .maybeSingle()
+    setAiMentionEnabled(!!data?.ai_egor_mention_enabled)
+    setAiMentionLoading(false)
+  }
+
+  const toggleAiMention = async () => {
+    const next = !aiMentionEnabled
+    setAiMentionEnabled(next)
+    setAiMentionSaving(true)
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ id: 1, ai_egor_mention_enabled: next })
+    if (error) {
+      setAiMentionEnabled(!next)
+      alert('Ошибка: ' + error.message)
+    } else {
+      onAiMentionChange?.(next)
+    }
+    setAiMentionSaving(false)
   }
 
   const loadPosts = async () => {
@@ -151,7 +186,14 @@ function AdminPanel() {
 
   const deletePost = async (id: string) => {
     if (!confirm('Удалить пост?')) return
-    await supabase.from('posts').delete().eq('id', id)
+    const { error: rpcError } = await supabase.rpc('admin_delete_post', { target_post_id: id })
+    if (rpcError) {
+      const { error: delErr } = await supabase.from('posts').delete().eq('id', id)
+      if (delErr) {
+        alert('Ошибка: ' + (delErr.message || rpcError.message))
+        return
+      }
+    }
     setPosts(prev => prev.filter(p => p.id !== id))
   }
 
@@ -184,7 +226,7 @@ function AdminPanel() {
     setUsers(prev => prev.filter(u => u.id !== id))
   }
 
-  const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
+  const tabs: { id: Tab; label: string; icon: ReactElement }[] = [
     { id: 'stats',   label: 'Статистика', icon: <BarChart2 size={15}/> },
     { id: 'posts',   label: 'Посты',      icon: <FileText size={15}/> },
     { id: 'users',   label: 'Юзеры',      icon: <Users size={15}/> },
@@ -252,6 +294,52 @@ function AdminPanel() {
               <div style={{ fontSize: 13, color: 'rgba(var(--t),0.4)', marginTop: 6 }}>{s.label}</div>
             </div>
           ))}
+          <div className="card" style={{ padding: '16px 18px', gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Режим бога</div>
+              <div style={{ fontSize: 12, color: 'rgba(var(--t),0.45)' }}>
+                Добавляет к тексту одну короткую позитивную фразу. Не влияет на уже опубликованные посты.
+              </div>
+            </div>
+            <button
+              onClick={toggleAiMention}
+              disabled={aiMentionLoading || aiMentionSaving}
+              aria-pressed={aiMentionEnabled}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: 0,
+                cursor: aiMentionLoading || aiMentionSaving ? 'not-allowed' : 'pointer',
+                opacity: aiMentionLoading || aiMentionSaving ? 0.6 : 1,
+              }}
+            >
+              <span
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: 46,
+                  height: 26,
+                  borderRadius: 999,
+                  background: aiMentionEnabled ? 'var(--text)' : 'rgba(var(--t),0.15)',
+                  transition: 'background 0.2s ease',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 3,
+                    left: aiMentionEnabled ? 24 : 3,
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    transition: 'left 0.2s ease',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </span>
+            </button>
+          </div>
         </div>
 
       ) : tab === 'posts' ? (

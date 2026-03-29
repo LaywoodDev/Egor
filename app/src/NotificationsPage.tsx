@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { Heart, MessageCircle, AtSign, Bell } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -9,6 +9,7 @@ interface UserNotification {
   comment_text: string | null
   read: boolean
   created_at: string
+  actor_id?: string | null
   actor_name: string
   actor_avatar: string | null
   actor_verified: boolean
@@ -28,7 +29,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '')
 }
 
-const TYPE_ICON: Record<string, { icon: JSX.Element; color: string }> = {
+const TYPE_ICON: Record<string, { icon: ReactElement; color: string }> = {
   like:      { icon: <Heart size={10} fill="#fff" stroke="none"/>, color: '#e53e3e' },
   comment:   { icon: <MessageCircle size={10} fill="#fff" stroke="none"/>, color: '#3b82f6' },
   mention:   { icon: <AtSign size={10} strokeWidth={2.5}/>, color: '#a78bfa' },

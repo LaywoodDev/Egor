@@ -1,18 +1,11 @@
-import { X } from 'lucide-react'
+﻿import { X } from 'lucide-react'
 
 const CHANGELOG = [
   {
     version: '1.0.0',
-    date: '28 марта 2025',
+    date: '28 марта 2026',
     changes: [
       'Запуск платформы',
-      'Публикация постов с изображениями и опросами',
-      'Система лайков, комментариев и упоминаний',
-      'Подписки и лента подписок',
-      'Категории постов',
-      'Уведомления в реальном времени',
-      'Светлая и тёмная тема',
-      'Настройки профиля и приватности',
     ],
   },
 ]
@@ -24,10 +17,12 @@ interface Props {
 function ChangelogModal({ onClose }: Props) {
   return (
     <div
+      className="modal-fade"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
       <div
+        className="modal-pop"
         style={{ background: 'var(--bg-card)', borderRadius: 20, width: '90%', maxWidth: 560, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}
       >

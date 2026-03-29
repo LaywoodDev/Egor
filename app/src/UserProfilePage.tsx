@@ -251,7 +251,7 @@ function UserProfilePage({ userId, onBack, onOpenPost, onOpenProfile, onFollowCh
     if (liked) {
       await supabase.from('likes').delete().eq('user_id', myUserId).eq('post_id', postId)
     } else {
-      const { error } = await supabase.from('likes').insert(
+      const { error } = await supabase.from('likes').upsert(
         { user_id: myUserId, post_id: postId },
         { onConflict: 'user_id,post_id', ignoreDuplicates: true }
       )

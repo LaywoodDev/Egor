@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, type ReactElement } from 'react'
 import { motion, useInView } from 'motion/react'
 import { Home as HomeIcon, Search, User, LogOut, MessageCircle, Eye, Bell } from 'lucide-react'
 import { linkify } from './linkify'
@@ -230,7 +230,7 @@ function PostCard({ post, liked, onLike, myAvatarUrl, onVote, onOpenPost, onOpen
   )
 }
 
-type NavItem = 'home' | 'search' | 'notifications' | 'profile'
+type NavItem = 'home' | 'search' | 'notifications' | 'profile' | 'admin'
 
 interface NotifToastData {
   id: string
@@ -268,6 +268,8 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifToasts, setNotifToasts] = useState<NotifToastData[]>([])
   const feedWrapperRef = useRef<HTMLDivElement | null>(null)
+  const [aiMentionEnabled, setAiMentionEnabled] = useState(false)
+  const aiMentionLoadedRef = useRef(false)
 
   const showNotifToast = (toast: NotifToastData) => {
     setNotifToasts(prev => [...prev, toast])
@@ -283,9 +285,21 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     })
     loadPosts()
     loadUnreadCount()
+    loadAiSetting()
     const hash = window.location.hash.slice(1)
     if (hash.startsWith('/post/')) setPendingPostId(hash.slice(6))
     else if (hash.startsWith('/profile/')) setPendingProfileId(hash.slice(9))
+  }, [])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('app-settings')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings', filter: 'id=eq.1' }, payload => {
+        const next = (payload.new as { ai_egor_mention_enabled?: boolean } | null)
+        if (next?.ai_egor_mention_enabled !== undefined) setAiMentionEnabled(next.ai_egor_mention_enabled)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   useEffect(() => {
@@ -396,6 +410,37 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     if (!error && data) setProfile(data)
   }
 
+  const loadAiSetting = async (force = false): Promise<boolean> => {
+    if (aiMentionLoadedRef.current && !force) return aiMentionEnabled
+    aiMentionLoadedRef.current = true
+    const { data } = await supabase
+      .from('app_settings')
+      .select('ai_egor_mention_enabled')
+      .eq('id', 1)
+      .maybeSingle()
+    const next = !!data?.ai_egor_mention_enabled
+    if (data?.ai_egor_mention_enabled !== undefined) setAiMentionEnabled(next)
+    return next
+  }
+
+  const augmentPostText = async (original: string) => {
+    if (!original.trim()) return original
+    if (/егор/i.test(original)) return original
+    try {
+      const res = await fetch('/api/augment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: original }),
+      })
+      if (!res.ok) return original
+      const data = await res.json()
+      if (typeof data?.text === 'string' && data.text.trim()) return data.text
+    } catch (e) {
+      console.warn('augment failed', e)
+    }
+    return original
+  }
+
   const parsePosts = (data: any[], myId: string | undefined, votes: any[]) =>
     data.map((p: any) => {
       const options: string[] = p.poll?.options ?? []
@@ -498,11 +543,13 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
   const addPost = async (text: string, imageUrl?: string | string[], pollOptions?: string[], category?: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    const enabled = await loadAiSetting(true)
+    const finalText = enabled ? await augmentPostText(text) : text
     const poll = pollOptions ? { options: pollOptions } : null
     const imageUrlStr = Array.isArray(imageUrl) ? JSON.stringify(imageUrl) : (imageUrl || null)
     const { data, error } = await supabase
       .from('posts')
-      .insert({ user_id: user.id, text, image_url: imageUrlStr, poll, category: category ?? null })
+      .insert({ user_id: user.id, text: finalText, image_url: imageUrlStr, poll, category: category ?? null })
       .select('*, profiles!posts_user_id_fkey(display_name, username), likes(id)')
       .single()
     if (!error && data) {
@@ -543,7 +590,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     if (liked) {
       await supabase.from('likes').delete().eq('user_id', userId).eq('post_id', postId)
     } else {
-      const { error } = await supabase.from('likes').insert(
+      const { error } = await supabase.from('likes').upsert(
         { user_id: userId, post_id: postId },
         { onConflict: 'user_id,post_id', ignoreDuplicates: true }
       )
@@ -580,7 +627,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
     else { setViewingUserId(uid); setSelectedPost(null) }
   }
 
-  const navItems: { id: NavItem; label: string; icon: JSX.Element; badge?: number }[] = [
+  const navItems: { id: NavItem; label: string; icon: ReactElement; badge?: number }[] = [
     { id: 'home',          label: 'Главная',      icon: <HomeIcon size={20}/> },
     { id: 'search',        label: 'Поиск',        icon: <Search size={20}/> },
     { id: 'notifications', label: 'Уведомления',  icon: <Bell size={20}/>, badge: unreadCount },
@@ -706,7 +753,7 @@ function Home({ onLogout, onOpenTerms, onOpenPrivacy }: Props) {
                 onOpenPost={postId => { const p = posts.find(x => x.id === postId); if (p) setSelectedPost(p) }}
               />
             ) : active === 'admin' ? (
-              <AdminPanel/>
+              <AdminPanel onAiMentionChange={setAiMentionEnabled}/>
             ) : active === 'search' ? (
               <SearchPage onOpenPost={post => setSelectedPost(post)} onOpenProfile={handleOpenProfile} onSelectCategory={id => setViewingCategory(id)}/>
             ) : active === 'profile' ? (

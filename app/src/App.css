@@ -28,6 +28,21 @@ html[data-theme="light"] {
   --btn-text:  #f0f0f5;
 }
 
+html[data-theme="extra-dark"] {
+  --bg:        #030304;
+  --bg-card:   #07070a;
+  --bg-input:  #0b0b10;
+  --bg-subtle: #09090d;
+  --bg-nav:    #060609;
+  --t:         255, 255, 255;
+  --text:      #ededf0;
+  --border:    rgba(255,255,255,0.045);
+  --border-sm: rgba(255,255,255,0.03);
+  --scrollbar: #14141a;
+  --btn-bg:    #ffffff;
+  --btn-text:  #030304;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -45,6 +60,20 @@ html[data-theme="light"] {
 @keyframes slot-in-down {
   from { transform: translateY(-100%); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
+}
+.modal-fade {
+  animation: modal-fade 0.18s ease;
+}
+.modal-pop {
+  animation: modal-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: perspective(700px) translateZ(90px) scale(1.05); }
+  to   { opacity: 1; transform: perspective(800px) translateZ(0) scale(1); }
 }
 .slot-up {
   animation: slot-in-up 0.35s ease;
@@ -1427,6 +1456,12 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.result-user-avatar img,
+.result-user-avatar svg {
+  display: block;
 }
 
 .result-user-info {
@@ -1971,6 +2006,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  animation: modal-fade 0.18s ease;
 }
 
 .settings-layout {
@@ -1982,6 +2018,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   border-radius: 24px;
   overflow: hidden;
   border: 1px solid rgba(var(--t), 0.08);
+  animation: modal-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .settings-sidebar {
@@ -2039,7 +2076,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 .settings-nav-item--active {
   background: rgba(var(--t), 0.08);
   color: var(--text);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .settings-content {
@@ -2063,6 +2100,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
     height: 92vh;
     border-radius: 24px 24px 0 0;
     max-width: 100%;
+    text-align: left;
   }
   .settings-sidebar {
     width: 100%;
@@ -2098,7 +2136,14 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
     min-height: 0;
     width: 100%;
     align-items: stretch;
+    text-align: left;
     box-sizing: border-box;
+  }
+  .settings-fields {
+    text-align: left;
+  }
+  .settings-content-header {
+    align-items: flex-start;
   }
   .settings-content-header {
     margin-bottom: 12px;
@@ -2108,15 +2153,22 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   }
   .settings-row {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 10px;
     padding: 16px 0;
+    text-align: left;
   }
   .settings-row-label {
+    width: 100%;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .settings-row-input-wrap {
     width: 100%;
   }
   .settings-select-btn {
     align-self: flex-start;
+    text-align: left;
   }
 }
 
@@ -2461,6 +2513,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   justify-content: center;
   z-index: 1200;
   backdrop-filter: blur(6px);
+  animation: modal-fade 0.18s ease;
 }
 
 .settings-delete-modal {
@@ -2471,6 +2524,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   border-radius: 18px;
   padding: 18px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  animation: modal-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .settings-delete-header {
@@ -2569,6 +2623,20 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   cursor: pointer;
 }
 
+@media (max-width: 560px) {
+  .settings-row {
+    align-items: stretch;
+  }
+  .settings-row-label {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .settings-row-title,
+  .settings-row-hint {
+    text-align: left;
+  }
+}
+
 .settings-header-right {
   display: flex;
   align-items: center;
@@ -2651,6 +2719,15 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 @keyframes slideDown {
   from { opacity: 1; transform: translateX(-50%) translateY(0); }
   to   { opacity: 0; transform: translateX(-50%) translateY(20px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-overlay,
+  .settings-layout,
+  .settings-delete-overlay,
+  .settings-delete-modal {
+    animation: none;
+  }
 }
 
 /* ── Notification toasts ── */
@@ -2832,5 +2909,25 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
     top: 0;
     background: var(--bg);
     z-index: 10;
+  }
+}
+
+@media (max-width: 560px) {
+  .settings-row {
+    flex-direction: row;
+    align-items: center;
+  }
+  .settings-row-label {
+    width: auto;
+    flex: 1;
+  }
+  .settings-row--stack,
+  .settings-row--column {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-row--stack .settings-row-label,
+  .settings-row--column .settings-row-label {
+    width: 100%;
   }
 }
